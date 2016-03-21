@@ -239,7 +239,13 @@ L_SIG_IDLE:
 	DRIVE_CLK_LOW
 	NOP
 	NOP
+	NOP
+	NOP
+	NOP
 	DRIVE_CLK_HIGH
+	NOP
+	NOP
+	NOP
 	SUB	r0, r0, 1
 	QBNE	L_SIG_IDLE, r0, 0
 	RET
@@ -252,6 +258,7 @@ SIG_IDLE:
 	// R0 = count
 	//
 	LBCO	r0, CT_PRUDRAM, 4, 4
+	LSL	r0, r0, 5
 	//
 	DRIVE_DIO_LOW
 	//
@@ -461,6 +468,7 @@ READ_REG:
 	//
 	LSR	r0, r0, 16
 	QBEQ	L_SKIP_IDLE_R, r0, 0
+	LSL	r0, r0, 3
 	JAL	r30.w0, DO_SIG_IDLE
 	//
 L_SKIP_IDLE_R:
@@ -538,6 +546,7 @@ WRITE_REG:
 	//
 	LSR	r0, r0, 16
 	QBEQ	L_SKIP_IDLE_W, r0, 0
+	LSL	r0, r0, 3
 	DRIVE_DIO_LOW
 	JAL	r30.w0, DO_SIG_IDLE
 	//
