@@ -60,6 +60,63 @@
 
 #define CTBIR_0         0x22020
 
+//
+//	DRIVE_CLK_HIGH - Macro to drive SWD_CLK "High"
+//
+.macro	DRIVE_CLK_HIGH
+	SBBO	r7, r5, GPIO_SETDATAOUT, 4
+.endm
+
+//
+//	DRIVE_CLK_LOW - Macro to drive SWD_CLK "Low"
+//
+.macro	DRIVE_CLK_LOW
+	SBBO	r7, r5, GPIO_CLEARDATAOUT, 4
+.endm
+
+//
+//	DRIVE_DIO_HIGH - Macro to drive SWD_DIO "High"
+//
+.macro	DRIVE_DIO_HIGH
+	SBBO	r6, r5, GPIO_SETDATAOUT, 4
+.endm
+
+//
+//	DRIVE_DIO_LOW - Macro to drive SWD_DIO "Low"
+//
+.macro	DRIVE_DIO_LOW
+	SBBO	r6, r5, GPIO_CLEARDATAOUT, 4
+.endm
+
+//
+//	TRN_INPUT - Macro to do TRN-bit for preparing input
+//
+.macro	TRN_INPUT
+	SET_DIO_INPUT r2
+	NOP
+	NOP
+	DRIVE_CLK_LOW
+	NOP
+	NOP
+	DRIVE_CLK_HIGH
+	NOP
+	NOP
+.endm
+
+//
+//	TRN_OUTPUT - Macro to do TRN-bit for preparing output
+//
+.macro	TRN_OUTPUT
+	DRIVE_CLK_LOW
+	NOP
+	NOP
+	DRIVE_CLK_HIGH
+	NOP
+	NOP
+	DRIVE_DIO_HIGH
+	SET_DIO_OUTPUT r2
+.endm
+
 START:
 	// Enable OCP master port to access GPIO
 	LBCO	r0, CT_PRUCFG, SYSCFG, 4
@@ -77,11 +134,11 @@ START:
 	LDI	r7, #SWD_CLK
 
 	// Initialize SWD_DIO and SWD_CLK pins
-	SBBO	r6, r5, GPIO_CLEARDATAOUT, 4  // DIO low
-	SBBO	r7, r5, GPIO_CLEARDATAOUT, 4  // CLK low
-	// SWD_DIO_oe <= Input, SWD_CLK_oe <= Output
+	DRIVE_DIO_HIGH
+	DRIVE_CLK_HIGH
+	// SWD_DIO_oe <= Output, SWD_CLK_oe <= Output
 	LBBO	r0, r5, GPIO_OE, 4
-	SET	r0, SWD_DIO_BIT
+	CLR	r0, SWD_DIO_BIT
 	CLR	r0, SWD_CLK_BIT
 	SBBO	r0, r5, GPIO_OE, 4
 
@@ -157,27 +214,38 @@ GPIO_IN:
 
 
 //
-//	SET_SWD_DIO_OUTPUT - Macro to set mode of SWD_DIO to output
+//	SET_DIO_OUTPUT - Macro to set mode of SWD_DIO to output
 //
-.macro	SET_SWD_DIO_OUTPUT
+.macro	SET_DIO_OUTPUT
 .mparam	rx
-	SBBO	r6, r5, GPIO_CLEARDATAOUT, 4   // DIO Low
 	// SWD_DIO_oe <= Output
 	LBBO	rx, r5, GPIO_OE, 4
 	CLR	rx, SWD_DIO_BIT
 	SBBO	rx, r5, GPIO_OE, 4
 .endm
+	
+//
+//	SET_DIO_INPUT - Macro to set mode of SWD_DIO to input
+//
+.macro	SET_DIO_INPUT
+.mparam	rx
+	// SWD_DIO_oe <= Input
+	LBBO	rx, r5, GPIO_OE, 4
+	SET	rx, SWD_DIO_BIT
+	SBBO	rx, r5, GPIO_OE, 4
+.endm
 
 DO_SIG_IDLE:
-	SET_SWD_DIO_OUTPUT r1
+	DRIVE_DIO_LOW
 	NOP
 L_SIG_IDLE:
-	SBBO	r7, r5, GPIO_CLEARDATAOUT, 4   // CLK Low
+	DRIVE_CLK_LOW
 	NOP
 	NOP
-	SBBO	r7, r5, GPIO_SETDATAOUT, 4     // CLK High
+	DRIVE_CLK_HIGH
 	SUB	r0, r0, 1
 	QBNE	L_SIG_IDLE, r0, 0
+	DRIVE_DIO_HIGH
 	RET
 
 //
@@ -209,7 +277,6 @@ SIG_GEN:
 	//
 	LBCO	r16, CT_PRUDRAM, 4, 32
 	//
-	SET_SWD_DIO_OUTPUT r2
 	// Start with r16, from LSB
 	MOV	r1.b0, &r16
 	LDI	r2, #1
@@ -218,34 +285,30 @@ L_SIG_GEN:
 	AND	r4, r2, r3
 	LSL	r2, r2, 1
 	QBNE	L_GEN_BIT1, r4, 0
-	SBBO	r6, r5, GPIO_CLEARDATAOUT, 4 // DIO low
+	DRIVE_DIO_LOW
 	QBA	L_GEN_BIT_DONE
 L_GEN_BIT1:
-	SBBO	r6, r5, GPIO_SETDATAOUT, 4   // DIO High
+	DRIVE_DIO_HIGH
 	NOP
 L_GEN_BIT_DONE:
-	SBBO	r7, r5, GPIO_CLEARDATAOUT, 4 // CLK Low
+	DRIVE_CLK_LOW
 	//
 	SUB	r0, r0, 1
 	QBNE	L_SKIP, r2, 0
 	MVID	r3, *r1.b0++
 	LDI	r2, #1
-	SBBO	r7, r5, GPIO_SETDATAOUT, 4   // CLK High
+	DRIVE_CLK_HIGH
 	QBNE	L_SIG_GEN, r0, 0
 L_SKIP:
 	NOP	
 	NOP	
-	SBBO	r7, r5, GPIO_SETDATAOUT, 4   // CLK High
+	DRIVE_CLK_HIGH
 	QBNE	L_SIG_GEN, r0, 0
-	//
-	SBBO	r6, r5, GPIO_CLEARDATAOUT, 4 // DIO low
-	// SWD_DIO_oe <= Input
-	LBBO	r1, r5, GPIO_OE, 4
-	SET	r1, SWD_DIO_BIT
-	SBBO	r1, r5, GPIO_OE, 4
 	//
 	LDI	r0, #0
 	SBCO	r0, CT_PRUDRAM, 64, 4
+	//
+	DRIVE_DIO_HIGH
 	QBA	COMMAND_DONE
 
 ///////////////////////////////////////////////////////////////////////////
@@ -297,16 +360,16 @@ L_111:	// Command WRITE_REG
 .macro	WRITE_SWD_DIO_BIT_L
 .mparam	src_bit, label_bit1, label_done
 	QBBS	label_bit1, src_bit
-	SBBO	r6, r5, GPIO_CLEARDATAOUT, 4 // DIO low
-	SBBO	r7, r5, GPIO_CLEARDATAOUT, 4 // CLK Low
+	DRIVE_DIO_LOW
+	DRIVE_CLK_LOW
 	QBA	label_done
 label_bit1:
-	SBBO	r6, r5, GPIO_SETDATAOUT, 4   // DIO High
-	SBBO	r7, r5, GPIO_CLEARDATAOUT, 4 // CLK Low
+	DRIVE_DIO_HIGH
+	DRIVE_CLK_LOW
 	NOP
 label_done:
 	NOP
-	SBBO	r7, r5, GPIO_SETDATAOUT, 4   // CLK High
+	DRIVE_CLK_HIGH // <---- Target read
 .endm
 //
 // WRITE_SWD_DIO_BIT - Macro writing SWD_DIO bit
@@ -322,14 +385,14 @@ label_done:
 //
 .macro	READ_SWD_DIO_BIT
 .mparam	rx, ry, label_1, label_done, shift=1
-	SBBO	r7, r5, GPIO_CLEARDATAOUT, 4 // CLK Low
+	DRIVE_CLK_LOW
 	LBBO	ry, r5, GPIO_DATAIN, 4
 	QBBS	label_1, ry, SWD_DIO_BIT
-	SBBO	r7, r5, GPIO_SETDATAOUT, 4   // CLK High
+	DRIVE_CLK_HIGH // <---- Host ack
 	LSR	rx, rx, shift
 	QBA	label_done
 label_1:
-	SBBO	r7, r5, GPIO_SETDATAOUT, 4   // CLK High
+	DRIVE_CLK_HIGH // <---- Host ack
 	SET	rx, 31
 	LSR	rx, rx, shift
 label_done:
@@ -345,7 +408,6 @@ READ_REG:
 	LBCO	r0.b0, CT_PRUDRAM, 1, 1
 	LBCO	r0.b2, CT_PRUDRAM, 3, 1
 	//
-	SET_SWD_DIO_OUTPUT r2
 	//
 	//
 	WRITE_SWD_DIO_BIT r0.t0, L_RRC0_BIT1, L_RRC0_DONE
@@ -356,17 +418,8 @@ READ_REG:
 	WRITE_SWD_DIO_BIT r0.t5, L_RRC5_BIT1, L_RRC5_DONE
 	WRITE_SWD_DIO_BIT r0.t6, L_RRC6_BIT1, L_RRC6_DONE
 	WRITE_SWD_DIO_BIT_L r0.t7, L_RRC7_BIT1, L_RRC7_DONE
-	// TRN
-	SBBO	r6, r5, GPIO_CLEARDATAOUT, 4 // DIO low
-	LBBO	r2, r5, GPIO_OE, 4
-	SET	r2, SWD_DIO_BIT
-	SBBO	r2, r5, GPIO_OE, 4           // SWD_DIO_oe <= Input
-	SBBO	r7, r5, GPIO_CLEARDATAOUT, 4 // CLK Low
-	NOP
-	NOP
-	SBBO	r7, r5, GPIO_SETDATAOUT, 4   // CLK High
-	NOP
-	NOP
+	//
+	TRN_INPUT
 	// Read ACK bits onto R3
 	READ_SWD_DIO_BIT r3, r2, L_RRD0_1, L_RRD0_F
 	READ_SWD_DIO_BIT r3, r2, L_RRD1_1, L_RRD1_F
@@ -409,12 +462,8 @@ READ_REG:
 	READ_SWD_DIO_BIT r4, r2, L_RRDy_1, L_RRDy_F, 0
 	// Parity bit
 	READ_SWD_DIO_BIT r3, r2, L_RRDz_1, L_RRDz_F, 0
-	// TRN
-	SBBO	r7, r5, GPIO_CLEARDATAOUT, 4 // CLK Low
-	NOP
-	NOP
-	SBBO	r7, r5, GPIO_SETDATAOUT, 4   // CLK High
 	//
+	TRN_OUTPUT
 	//
 	LSR	r0, r0, 16
 	QBEQ	L_SKIP_IDLE_R, r0, 0
@@ -439,7 +488,6 @@ WRITE_REG:
 	LBCO	r0.b2, CT_PRUDRAM, 3, 1
 	LBCO	r1, CT_PRUDRAM, 4, 8
 	//
-	SET_SWD_DIO_OUTPUT r2
 	//
 	WRITE_SWD_DIO_BIT r0.t0, L_WRC0_BIT1, L_WRC0_DONE
 	WRITE_SWD_DIO_BIT r0.t1, L_WRC1_BIT1, L_WRC1_DONE
@@ -449,28 +497,14 @@ WRITE_REG:
 	WRITE_SWD_DIO_BIT r0.t5, L_WRC5_BIT1, L_WRC5_DONE
 	WRITE_SWD_DIO_BIT r0.t6, L_WRC6_BIT1, L_WRC6_DONE
 	WRITE_SWD_DIO_BIT_L r0.t7, L_WRC7_BIT1, L_WRC7_DONE
-	// TRN
-	SBBO	r6, r5, GPIO_CLEARDATAOUT, 4 // DIO low
-	LBBO	r2, r5, GPIO_OE, 4
-	SET	r2, SWD_DIO_BIT
-	SBBO	r2, r5, GPIO_OE, 4           // SWD_DIO_oe <= Input
-	SBBO	r7, r5, GPIO_CLEARDATAOUT, 4 // CLK Low
-	NOP
-	NOP
-	SBBO	r7, r5, GPIO_SETDATAOUT, 4   // CLK High
-	NOP
-	NOP
+	//
+	TRN_INPUT
 	// Read ACK bits onto R3
 	READ_SWD_DIO_BIT r3, r2, L_WRA0_1, L_WRA0_F
 	READ_SWD_DIO_BIT r3, r2, L_WRA1_1, L_WRA1_F
 	READ_SWD_DIO_BIT r3, r2, L_WRA2_1, L_WRA2_F, 29
-	// TRN
-	SBBO	r7, r5, GPIO_CLEARDATAOUT, 4 // CLK Low
-	NOP
-	NOP
-	SBBO	r7, r5, GPIO_SETDATAOUT, 4   // CLK High
 	//
-	SET_SWD_DIO_OUTPUT r2
+	TRN_OUTPUT
 	//
 	WRITE_SWD_DIO_BIT r1.t0, L_WRD0_BIT1, L_WRD0_DONE
 	WRITE_SWD_DIO_BIT r1.t1, L_WRD1_BIT1, L_WRD1_DONE
@@ -505,6 +539,9 @@ WRITE_REG:
 	WRITE_SWD_DIO_BIT r1.t30, L_WRDu_BIT1, L_WRDu_DONE
 	WRITE_SWD_DIO_BIT r1.t31, L_WRDv_BIT1, L_WRDv_DONE
 	WRITE_SWD_DIO_BIT_L r0.t8, L_WRDw_BIT1, L_WRDw_DONE
+	NOP
+	NOP
+	DRIVE_DIO_HIGH
 	//
 	//
 	LSR	r0, r0, 16
