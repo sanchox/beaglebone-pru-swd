@@ -1,9 +1,17 @@
-2016-03-21
+============================ Fixed by 411900b
+2016-03-21 18:00
 
-Test program partially works well.
+FAILURE at:
+ bbg_swd_read_reg(): FAULT AP read reg 0 = ffffffff
+ bbg_swd_read_reg(): SWD_ACK_FAULT
+
+============================ Fixed by c4df3ef
+2016-03-21 15:00
+
+Test program partially works well somehow.
 Success on getting ID of STM32F103's SWD =1ba01477.
 
-FAILURE:
+FAILURE at:
 DP read register 4 (cmd=0x8d) failed with parity error.
 Value=f4000001, but parity=1 (should be 0).
 
