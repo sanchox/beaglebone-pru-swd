@@ -1,4 +1,5 @@
 BeagleBoneGreen SWD - a practical tool for computing freedom
+
 							Version 0.01
 							  2016-03-2x
 							Niibe Yutaka
@@ -47,8 +48,33 @@ I use "bone-kernel" for that.
 Software License
 ================
 
-pru-swd.p is distributed under GPLv3+.
-he patch to OpenOCD is under GPLv2+.
+The program pru-swd.p is distributed under GPLv3+.
+
+The OpenOCD patch  is under GPLv2+.
+
+
+Patch for OpenOCD
+=================
+
+The patch is: 
+	0001-initial-patch-for-BBG-SWD.patch
+
+You can configure BBG-SWD driver by the --enable-bbg-swd option.
+
+    ./configure --enable-bbg-swd
+
+You can use it with a configuration like:
+
+-------------------------- File: bbg-swd.cfg
+interface bbg-swd
+transport select swd
+--------------------------
+
+The invacatio of command is something like this:
+
+    $ openocd -f  bbg-swd.cfg -f target/stm32f1x.cfg
+
+The above is the case for FST-01.
 
 
 Request-Response
@@ -97,4 +123,7 @@ GPIO_OUT(bit, value): none
 
 GPIO_IN(): value
 	control GPIO signal directly, input
---
+
+
+Enjoy,
+-- 
