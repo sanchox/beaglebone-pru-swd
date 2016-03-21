@@ -1,4 +1,4 @@
-From 54d479761de86a235d4c9f05479df07b5ea11573 Mon Sep 17 00:00:00 2001
+From fb88409473ee70e6abd84e34cb726b44784bea51 Mon Sep 17 00:00:00 2001
 From: NIIBE Yutaka <gniibe@fsij.org>
 Date: Mon, 21 Mar 2016 04:38:39 +0000
 Subject: [PATCH] initial patch for BBG-SWD
@@ -6,10 +6,10 @@ Subject: [PATCH] initial patch for BBG-SWD
 ---
  configure.ac                 |  13 ++
  src/jtag/drivers/Makefile.am |   3 +
- src/jtag/drivers/bbg-swd.c   | 439 +++++++++++++++++++++++++++++++++++++++++++
+ src/jtag/drivers/bbg-swd.c   | 443 +++++++++++++++++++++++++++++++++++++++++++
  src/jtag/drivers/bbg-swd.h   |  44 +++++
  src/jtag/interfaces.c        |   6 +
- 5 files changed, 505 insertions(+)
+ 5 files changed, 509 insertions(+)
  create mode 100644 src/jtag/drivers/bbg-swd.c
  create mode 100644 src/jtag/drivers/bbg-swd.h
 
@@ -67,10 +67,10 @@ index 2aaf8fd..4a87324 100644
  	bitbang.h \
 diff --git a/src/jtag/drivers/bbg-swd.c b/src/jtag/drivers/bbg-swd.c
 new file mode 100644
-index 0000000..3cfb312
+index 0000000..b795af7
 --- /dev/null
 +++ b/src/jtag/drivers/bbg-swd.c
-@@ -0,0 +1,439 @@
+@@ -0,0 +1,443 @@
 +/***************************************************************************
 + *   Copyright (C) 2016  Flying Stone Technology                           *
 + *   Author: NIIBE Yutaka <gniibe@fsij.org>                                *
@@ -116,7 +116,10 @@ index 0000000..3cfb312
 +	/* Wait PRU0 response.  */
 +	prussdrv_pru_wait_event(PRU_EVTOUT_0);
 +	prussdrv_pru_clear_event(PRU_EVTOUT_0, PRU0_ARM_INTERRUPT);
-+	LOG_DEBUG("Request of command execution (%08x)", *p);
++	if ((p[0] & 0xff) == 4 || (p[0] & 0xff) == 5 || (p[0] & 0xff) == 7)
++		LOG_DEBUG("BBD-SWD: command execution (%08x:%08x)", p[0], p[1]);
++	else
++		LOG_DEBUG("BBD-SWD: command execution (%08x)", p[0]);
 +}
 +
 +static int queued_retval;
@@ -350,6 +353,7 @@ index 0000000..3cfb312
 +{
 +	LOG_DEBUG("bbg_swd_write_reg");
 +	assert(!(cmd & SWD_CMD_RnW));
++	assert(ap_delay_clk < 256);
 +
 +	if (queued_retval != ERROR_OK) {
 +		LOG_DEBUG("Skip bbg_swd_write_reg because queued_retval=%d", queued_retval);
@@ -361,7 +365,6 @@ index 0000000..3cfb312
 +		int parity = parity_u32(value);
 +		uint32_t delay = 0;
 +
-+		assert(ap_delay_clk < 256);
 +		if (cmd & SWD_CMD_APnDP)
 +			delay = ap_delay_clk;
 +
@@ -399,10 +402,11 @@ index 0000000..3cfb312
 +
 +static int bbg_swd_run_queue(void)
 +{
++	int retval;
++
 +	LOG_DEBUG("bbg_swd_run_queue");
 +	bbg_swd_idle(8);
-+
-+	int retval = queued_retval;
++	retval = queued_retval;
 +	queued_retval = ERROR_OK;
 +	LOG_DEBUG("SWD queue return value: %02x", retval);
 +	return retval;
