@@ -1,0 +1,31 @@
+2016-03-21
+
+Test program partially works well.
+Success on getting ID of STM32F103's SWD =1ba01477.
+
+FAILURE:
+DP read register 4 (cmd=0x8d) failed with parity error.
+Value=f4000001, but parity=1 (should be 0).
+
+$ sudo ./test-pru
+Start testing PRUSS for SWD protocol
+Started execution of PRU-SWU program on PRUSS
+Request (00003805) done
+Request (00007605) done
+Request (0000a506) done
+parity-ack= 00000001
+value = 1ba01477
+Request (00008107) done
+ack= 00000001
+Request (00000004) done
+Request (0000b107) done
+ack= 00000001
+Request (0001a907) done
+ack= 00000001
+Request (00008d06) done
+parity-ack= 80000001
+value = f4000001
+Request (00000001) done
+Request (00000000) done
+$ 
+-- 
