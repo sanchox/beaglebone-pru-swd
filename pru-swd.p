@@ -355,29 +355,20 @@ L_111:	// Command WRITE_REG
 
 
 //
-// WRITE_SWD_DIO_BIT_L - Macro writing SWD_DIO bit, last version
-//
-.macro	WRITE_SWD_DIO_BIT_L
-.mparam	src_bit, label_bit1, label_done
-	QBBS	label_bit1, src_bit
-	DRIVE_DIO_LOW
-	DRIVE_CLK_LOW
-	QBA	label_done
-label_bit1:
-	DRIVE_DIO_HIGH
-	DRIVE_CLK_LOW
-	NOP
-label_done:
-	NOP
-	DRIVE_CLK_HIGH // <---- Target read
-.endm
-//
 // WRITE_SWD_DIO_BIT - Macro writing SWD_DIO bit
 //
 .macro	WRITE_SWD_DIO_BIT
 .mparam	src_bit, label_bit1, label_done
-	WRITE_SWD_DIO_BIT_L src_bit, label_bit1, label_done
+	QBBS	label_bit1, src_bit
+	DRIVE_CLK_LOW
+	DRIVE_DIO_LOW
+	QBA	label_done
+label_bit1:
+	DRIVE_CLK_LOW
+	DRIVE_DIO_HIGH
 	NOP
+label_done:
+	DRIVE_CLK_HIGH // <---- Target read
 	NOP
 .endm
 //
@@ -386,15 +377,13 @@ label_done:
 .macro	READ_SWD_DIO_BIT
 .mparam	rx, ry, label_1, label_done, shift=1
 	DRIVE_CLK_LOW
-	LBBO	ry, r5, GPIO_DATAIN, 4
-	QBBS	label_1, ry, SWD_DIO_BIT
-	DRIVE_CLK_HIGH // <---- Host ack
 	LSR	rx, rx, shift
+	LBBO	ry, r5, GPIO_DATAIN, 4
+	DRIVE_CLK_HIGH // <---- Host ack
+	QBBS	label_1, ry, SWD_DIO_BIT
 	QBA	label_done
 label_1:
-	DRIVE_CLK_HIGH // <---- Host ack
 	SET	rx, 31
-	LSR	rx, rx, shift
 label_done:
 .endm
 //
@@ -417,13 +406,13 @@ READ_REG:
 	WRITE_SWD_DIO_BIT r0.t4, L_RRC4_BIT1, L_RRC4_DONE
 	WRITE_SWD_DIO_BIT r0.t5, L_RRC5_BIT1, L_RRC5_DONE
 	WRITE_SWD_DIO_BIT r0.t6, L_RRC6_BIT1, L_RRC6_DONE
-	WRITE_SWD_DIO_BIT_L r0.t7, L_RRC7_BIT1, L_RRC7_DONE
+	WRITE_SWD_DIO_BIT r0.t7, L_RRC7_BIT1, L_RRC7_DONE
 	//
 	TRN_INPUT
 	// Read ACK bits onto R3
 	READ_SWD_DIO_BIT r3, r2, L_RRD0_1, L_RRD0_F
 	READ_SWD_DIO_BIT r3, r2, L_RRD1_1, L_RRD1_F
-	READ_SWD_DIO_BIT r3, r2, L_RRD2_1, L_RRD2_F, 29
+	READ_SWD_DIO_BIT r3, r2, L_RRD2_1, L_RRD2_F
 	// Read RDATA bits onto R4
 	READ_SWD_DIO_BIT r4, r2, L_RRD3_1, L_RRD3_F
 	READ_SWD_DIO_BIT r4, r2, L_RRD4_1, L_RRD4_F
@@ -459,9 +448,9 @@ READ_REG:
 	READ_SWD_DIO_BIT r4, r2, L_RRDv_1, L_RRDv_F
 	READ_SWD_DIO_BIT r4, r2, L_RRDw_1, L_RRDw_F
 	READ_SWD_DIO_BIT r4, r2, L_RRDx_1, L_RRDx_F
-	READ_SWD_DIO_BIT r4, r2, L_RRDy_1, L_RRDy_F, 0
+	READ_SWD_DIO_BIT r4, r2, L_RRDy_1, L_RRDy_F
 	// Parity bit
-	READ_SWD_DIO_BIT r3, r2, L_RRDz_1, L_RRDz_F, 0
+	READ_SWD_DIO_BIT r3, r2, L_RRDz_1, L_RRDz_F, 29
 	//
 	TRN_OUTPUT
 	//
@@ -496,13 +485,13 @@ WRITE_REG:
 	WRITE_SWD_DIO_BIT r0.t4, L_WRC4_BIT1, L_WRC4_DONE
 	WRITE_SWD_DIO_BIT r0.t5, L_WRC5_BIT1, L_WRC5_DONE
 	WRITE_SWD_DIO_BIT r0.t6, L_WRC6_BIT1, L_WRC6_DONE
-	WRITE_SWD_DIO_BIT_L r0.t7, L_WRC7_BIT1, L_WRC7_DONE
+	WRITE_SWD_DIO_BIT r0.t7, L_WRC7_BIT1, L_WRC7_DONE
 	//
 	TRN_INPUT
 	// Read ACK bits onto R3
 	READ_SWD_DIO_BIT r3, r2, L_WRA0_1, L_WRA0_F
 	READ_SWD_DIO_BIT r3, r2, L_WRA1_1, L_WRA1_F
-	READ_SWD_DIO_BIT r3, r2, L_WRA2_1, L_WRA2_F, 29
+	READ_SWD_DIO_BIT r3, r2, L_WRA2_1, L_WRA2_F
 	//
 	TRN_OUTPUT
 	//
@@ -538,9 +527,8 @@ WRITE_REG:
 	WRITE_SWD_DIO_BIT r1.t29, L_WRDt_BIT1, L_WRDt_DONE
 	WRITE_SWD_DIO_BIT r1.t30, L_WRDu_BIT1, L_WRDu_DONE
 	WRITE_SWD_DIO_BIT r1.t31, L_WRDv_BIT1, L_WRDv_DONE
-	WRITE_SWD_DIO_BIT_L r0.t8, L_WRDw_BIT1, L_WRDw_DONE
-	NOP
-	NOP
+	WRITE_SWD_DIO_BIT r0.t8, L_WRDw_BIT1, L_WRDw_DONE
+	LSR	r3, r3, 29
 	DRIVE_DIO_HIGH
 	//
 	//
