@@ -1,0 +1,33 @@
+========================
+2016-03-22 10:00
+
+Access to DP works well.
+Access to AP seems have a problem.
+
+Failure pattern:
+	Two AP writes (first AP write) and then AP read.
+
+FAILURE at:
+Debug: 300 297 bbg-swd.c:222 bbg_swd_read_reg(): bbg_swd_read_reg
+Debug: 301 297 bbg-swd.c:49 pru_request_cmd(): BBD-SWD: command execution (ff009f06)
+Debug: 302 298 bbg-swd.c:252 bbg_swd_read_reg(): OK AP read reg C = 14770011
+Debug: 303 298 bbg-swd.c:222 bbg_swd_read_reg(): bbg_swd_read_reg
+Debug: 304 298 bbg-swd.c:49 pru_request_cmd(): BBD-SWD: command execution (0000bd06)
+Debug: 305 298 bbg-swd.c:252 bbg_swd_read_reg(): OK DP read reg C = 14770011
+Debug: 306 299 bbg-swd.c:335 bbg_swd_run_queue(): bbg_swd_run_queue
+Debug: 307 299 bbg-swd.c:47 pru_request_cmd(): BBD-SWD: command execution (00000004:00000008)
+Debug: 308 299 bbg-swd.c:339 bbg_swd_run_queue(): SWD queue return value: 00
+Debug: 309 2325 arm_adi_v5.c:789 dap_find_ap(): Found AHB-AP at AP index: 0 (IDR=0x14770011)
+Debug: 310 2325 bbg-swd.c:286 bbg_swd_write_reg(): bbg_swd_write_reg
+Debug: 311 2325 bbg-swd.c:47 pru_request_cmd(): BBD-SWD: command execution (0000b107:00000000)
+Debug: 312 2325 bbg-swd.c:316 bbg_swd_write_reg(): OK DP write reg 8 = 00000000
+Debug: 313 2325 bbg-swd.c:286 bbg_swd_write_reg(): bbg_swd_write_reg
+Debug: 314 3325 bbg-swd.c:47 pru_request_cmd(): BBD-SWD: command execution (0800a307:a2000020)
+Debug: 315 3326 bbg-swd.c:316 bbg_swd_write_reg(): OK AP write reg 0 = a2000020
+Debug: 316 4326 bbg-swd.c:286 bbg_swd_write_reg(): bbg_swd_write_reg
+Debug: 317 5326 bbg-swd.c:47 pru_request_cmd(): BBD-SWD: command execution (08008b07:00000000)
+Debug: 318 5326 bbg-swd.c:316 bbg_swd_write_reg(): OK AP write reg 4 = 00000000
+Debug: 319 6327 bbg-swd.c:222 bbg_swd_read_reg(): bbg_swd_read_reg
+Debug: 320 7327 bbg-swd.c:49 pru_request_cmd(): BBD-SWD: command execution (08008706)
+Debug: 321 7327 bbg-swd.c:254 bbg_swd_read_reg(): FAULT AP read reg 0 = ffffffff
+Debug: 322 7327 bbg-swd.c:273 bbg_swd_read_reg(): SWD_ACK_FAULT
