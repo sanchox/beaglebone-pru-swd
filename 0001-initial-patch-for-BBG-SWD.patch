@@ -1,15 +1,15 @@
-From fb88409473ee70e6abd84e34cb726b44784bea51 Mon Sep 17 00:00:00 2001
+From ee1d60eba7f9c35571241c1da4c8175c8b98daa1 Mon Sep 17 00:00:00 2001
 From: NIIBE Yutaka <gniibe@fsij.org>
-Date: Mon, 21 Mar 2016 04:38:39 +0000
+Date: Tue, 22 Mar 2016 03:06:37 +0000
 Subject: [PATCH] initial patch for BBG-SWD
 
 ---
  configure.ac                 |  13 ++
  src/jtag/drivers/Makefile.am |   3 +
- src/jtag/drivers/bbg-swd.c   | 443 +++++++++++++++++++++++++++++++++++++++++++
+ src/jtag/drivers/bbg-swd.c   | 444 +++++++++++++++++++++++++++++++++++++++++++
  src/jtag/drivers/bbg-swd.h   |  44 +++++
  src/jtag/interfaces.c        |   6 +
- 5 files changed, 509 insertions(+)
+ 5 files changed, 510 insertions(+)
  create mode 100644 src/jtag/drivers/bbg-swd.c
  create mode 100644 src/jtag/drivers/bbg-swd.h
 
@@ -67,10 +67,10 @@ index 2aaf8fd..4a87324 100644
  	bitbang.h \
 diff --git a/src/jtag/drivers/bbg-swd.c b/src/jtag/drivers/bbg-swd.c
 new file mode 100644
-index 0000000..b795af7
+index 0000000..0363f45
 --- /dev/null
 +++ b/src/jtag/drivers/bbg-swd.c
-@@ -0,0 +1,443 @@
+@@ -0,0 +1,444 @@
 +/***************************************************************************
 + *   Copyright (C) 2016  Flying Stone Technology                           *
 + *   Author: NIIBE Yutaka <gniibe@fsij.org>                                *
@@ -267,6 +267,7 @@ index 0000000..b795af7
 +		pru_data_ram[0] = CMD_SIG_GEN | (swd_seq_jtag_to_swd_len << 8);
 +		memcpy (&pru_data_ram[1], swd_seq_jtag_to_swd, swd_seq_jtag_to_swd_len);
 +		pru_request_cmd(pru_data_ram);
++		bbg_swd_idle(8);
 +		break;
 +	case SWD_TO_JTAG:
 +		LOG_DEBUG("JTAG-to-SWD");
