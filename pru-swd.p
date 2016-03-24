@@ -23,6 +23,16 @@
 .origin 0
 .entrypoint START
 
+#define CONST_DELAY		47 // 470ns To be 1000 kHz
+
+//
+//	DELAY - Macro for do nothing but wait
+//
+.macro	DELAY
+	JAL	r29.w0, DELAY_10NS
+.endm
+
+
 #define PRU0_ARM_INTERRUPT	19
 
 // Constant Table
@@ -94,8 +104,10 @@
 .macro	TRN_INPUT
 	DRIVE_CLK_LOW
 	SET_DIO_INPUT r2
+	DELAY
 	NOP
 	DRIVE_CLK_HIGH
+	DELAY
 	NOP
 	NOP
 .endm
@@ -221,9 +233,11 @@ GPIO_IN:
 DO_SIG_IDLE:
 L_SIG_IDLE:
 	DRIVE_CLK_LOW
+	DELAY
 	NOP
 	NOP
 	DRIVE_CLK_HIGH
+	DELAY
 	SUB	r0, r0, 1
 	QBNE	L_SIG_IDLE, r0, 0
 	RET
@@ -285,11 +299,13 @@ L_GEN_BIT1:
 	NOP
 L_GEN_BIT_DONE:
 	//
+	DELAY
 	QBNE	L_NO_LOAD, r2, 0
 	MVID	r3, *r1.b0++
 	LDI	r2, #1
 L_NEXT_BIT:
 	DRIVE_CLK_HIGH
+	DELAY
 	QBNE	L_GEN_LOOP, r0, 0
 	//
 L_SIG_GEN_DONE:
@@ -341,6 +357,12 @@ L_111:	// Command WRITE_REG
 	QBA	WRITE_REG
 ///////////////////////////////////////////////////////////////////////////
 
+DELAY_10NS: // delay_clocks = CONST_DELAY * 2 + 2
+	LDI	r8, #CONST_DELAY
+L_DELAY:
+	SUB	r8, r8, 1
+	QBNE	L_DELAY, r8, 1
+	JMP	r29.w0
 
 //
 // WRITE_SWD_DIO_BIT_NO_LAST_NOP - Macro writing SWD_DIO bit, but NOP
@@ -356,7 +378,9 @@ label_bit1:
 	DRIVE_DIO_HIGH
 	NOP
 label_done:
+	DELAY
 	DRIVE_CLK_HIGH // <---- Target read
+	DELAY
 .endm
 //
 // WRITE_SWD_DIO_BIT_NO_LAST_NOP - Macro writing SWD_DIO bit, with NOP
@@ -374,12 +398,14 @@ label_done:
 	DRIVE_CLK_LOW
 	LSR	rx, rx, shift
 	LBBO	ry, r5, GPIO_DATAIN, 4
+	DELAY
 	DRIVE_CLK_HIGH
 	QBBS	label_1, ry, SWD_DIO_BIT
 	QBA	label_done
 label_1:
 	SET	rx, 31
 label_done:
+	DELAY
 .endm
 //
 //	READ_REG - execute READ_REG transaction
@@ -449,10 +475,12 @@ READ_REG:
 	READ_SWD_DIO_BIT r3, r2, L_RRDz_1, L_RRDz_F, 29
 	// TRN
 	DRIVE_CLK_LOW
+	DELAY
 	NOP
 	NOP
 	DRIVE_CLK_HIGH
 	//
+	DELAY
 	LSR	r0, r0, 16
 	QBEQ	L_SKIP_IDLE_R, r0, 0
 	DRIVE_DIO_LOW
@@ -499,6 +527,7 @@ WRITE_REG:
 	//
 	// TRN and WRITE the first bit
 	DRIVE_CLK_LOW
+	DELAY
 	NOP
 	QBBS	L_WRD0_BIT1, r1.t0
 	DRIVE_CLK_HIGH
@@ -509,10 +538,13 @@ L_WRD0_BIT1:
 	DRIVE_DIO_HIGH
 	NOP
 L_WRD0_DONE:
+	DELAY
 	DRIVE_CLK_LOW
 	SET_DIO_OUTPUT r2
+	DELAY
 	NOP
 	DRIVE_CLK_HIGH
+	DELAY
 	NOP
 	//
 	WRITE_SWD_DIO_BIT r1.t1, L_WRD1_BIT1, L_WRD1_DONE
