@@ -1,0 +1,25 @@
+From a05ed40182c57aa43970cc8ffb7095076a266289 Mon Sep 17 00:00:00 2001
+From: NIIBE Yutaka <gniibe@fsij.org>
+Date: Thu, 24 Mar 2016 15:44:06 +0000
+Subject: [PATCH 2/2] minor tweak for BBG-SWG
+
+---
+ src/target/cortex_m.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/target/cortex_m.c b/src/target/cortex_m.c
+index 6786c46..c14d760 100644
+--- a/src/target/cortex_m.c
++++ b/src/target/cortex_m.c
+@@ -1908,7 +1908,7 @@ int cortex_m_examine(struct target *target)
+ 		}
+ 
+ 		/* Leave (only) generic DAP stuff for debugport_init(); */
+-		armv7m->debug_ap->memaccess_tck = 8;
++		armv7m->debug_ap->memaccess_tck = 32;
+ 
+ 		retval = mem_ap_init(armv7m->debug_ap);
+ 		if (retval != ERROR_OK)
+-- 
+2.1.4
+

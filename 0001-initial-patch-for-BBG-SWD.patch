@@ -1,7 +1,7 @@
 From ee1d60eba7f9c35571241c1da4c8175c8b98daa1 Mon Sep 17 00:00:00 2001
 From: NIIBE Yutaka <gniibe@fsij.org>
 Date: Tue, 22 Mar 2016 03:06:37 +0000
-Subject: [PATCH] initial patch for BBG-SWD
+Subject: [PATCH 1/2] initial patch for BBG-SWD
 
 ---
  configure.ac                 |  13 ++

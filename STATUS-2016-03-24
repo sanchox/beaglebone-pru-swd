@@ -1,0 +1,4 @@
+Access to ARM core (register read/write) works.
+
+Access to memory fails.
+Because of this, identification of MCU fails.
