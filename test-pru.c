@@ -178,12 +178,14 @@ submit_read_cmd (uint32_t *p, uint8_t dap_addr)
 #define MEM_AP_DRW_RD  0x0F
 
 /* Cortex M3 Debug Registers (AHB addresses) */
-#define DDFSR   0xE000ED30      /* Debug Fault StatusRegister                           */
-#define DHCSR   0xE000EDF0      /* Debug Halting Control and Status Register            */
-#define DCRSR   0xE000EDF4      /* Debug Core Register Selector Register                */
-#define DCRDR   0xE000EDF8      /* Debug Core Register Data Register                    */
-#define DEMCR   0xE000EDFC      /* Debug Exception and Monitor Control Register         */
-#define AIRCR   0xE000ED0C      /* The Application Interrupt and Reset Control Register */
+#define DDFSR   0xE000ED30 /* Debug Fault StatusRegister                   */
+#define DHCSR   0xE000EDF0 /* Debug Halting Control and Status Register    */
+#define DCRSR   0xE000EDF4 /* Debug Core Register Selector Register        */
+#define DCRDR   0xE000EDF8 /* Debug Core Register Data Register            */
+#define DEMCR   0xE000EDFC /* Debug Exception and Monitor Control Register */
+#define AIRCR   0xE000ED0C /* The Application Interrupt and Reset Control Register */
+
+#define CPUID	0xE000ED00 /* CPU Identification Register */
 
 static void
 mcu_halt (uint32_t *p)
@@ -198,17 +200,48 @@ mcu_halt (uint32_t *p)
 
   /* DHCSR.C_DEBUGEN = 1, C_HALT =1 */
   submit_write_cmd (p, MEM_AP_TAR, DHCSR);
-  submit_write_cmd (p, MEM_AP_DRW_WR, 0xA05F0001);
+  submit_write_cmd (p, MEM_AP_DRW_WR, 0xA05F0003);
 
-  /* DEMCR.VC_CORERESET = 1 */
-  submit_write_cmd (p, MEM_AP_TAR, DEMCR);
-  submit_write_cmd (p, MEM_AP_DRW_WR, 0x00000001);
+  puts ("Halting MCU...done");
+}
+
+static void
+mcu_reset (uint32_t *p)
+{
+  puts ("Reseting MCU...");
+
+  /* Select memory access port bank 0 */
+  submit_write_cmd (p, DAP_SELECT_WR, 0x00000000);
+
+  /* Specify 32 bit memory access, auto increment */
+  submit_write_cmd (p, MEM_AP_CSW, 0x23000002);
 
   /* Reset the core */
   submit_write_cmd (p, MEM_AP_TAR, AIRCR);
-  submit_write_cmd (p, MEM_AP_DRW_WR, 0xFA050004);
+  submit_write_cmd (p, MEM_AP_DRW_WR, 0x05FA0004);
 
-  puts ("Halting MCU...done");
+  puts ("Reseting MCU...done");
+}
+
+static uint32_t 
+read_cpuid (uint32_t *p)
+{
+  uint32_t v;
+
+  puts ("Reading MCU ID...");
+
+  /* Select memory access port bank 0 */
+  submit_write_cmd (p, DAP_SELECT_WR, 0x00000000);
+
+  /* Specify 32 bit memory access, auto increment */
+  submit_write_cmd (p, MEM_AP_CSW, 0x23000002);
+
+  /* Read the value from CPUID */
+  submit_write_cmd (p, MEM_AP_TAR, CPUID);
+  v = submit_read_cmd (p, MEM_AP_DRW_RD);
+
+  puts ("Reading MCU ID...done");
+  return v;
 }
 
 static uint32_t 
@@ -259,6 +292,46 @@ write_arm_reg  (uint32_t *p, int n, uint32_t value)
 }
 
 
+static uint32_t 
+read_mem (uint32_t *p, uint32_t addr)
+{
+  uint32_t v;
+
+  printf ("Reading memory %08x...\n", addr);
+
+  /* Select memory access port bank 0 */
+  submit_write_cmd (p, DAP_SELECT_WR, 0x00000000);
+
+  /* Specify 32 bit memory access, auto increment */
+  submit_write_cmd (p, MEM_AP_CSW, 0x23000002);
+
+  /* Read from ADDR */
+  submit_write_cmd (p, MEM_AP_TAR, addr);
+  v = submit_read_cmd (p, MEM_AP_DRW_RD);
+
+  printf ("Reading memory %08x...done\n", addr);
+  return v;
+}
+
+static void
+write_mem  (uint32_t *p, uint32_t addr, uint32_t value)
+{
+  printf ("Writing memory %08x on MCU...\n", addr);
+
+  /* Select memory access port bank 0 */
+  submit_write_cmd (p, DAP_SELECT_WR, 0x00000000);
+
+  /* Specify 32 bit memory access, auto increment */
+  submit_write_cmd (p, MEM_AP_CSW, 0x23000002);
+
+  /* Write the value to ADDR */
+  submit_write_cmd (p, MEM_AP_TAR, addr);
+  submit_write_cmd (p, MEM_AP_DRW_WR, value);
+
+  printf ("Writing memory %08x on MCU...\n", addr);
+}
+
+
 int
 main (void)
 {
@@ -293,7 +366,7 @@ main (void)
   prussdrv_exec_program (PRU_NUM, "./pru-swd.bin");
 
   /*
-   * RESET
+   * LINE RESET
    */
   p[0] = 0x05 | (swd_seq_line_reset_len << 8);
   memcpy (&p[1], swd_seq_line_reset, sizeof swd_seq_line_reset);
@@ -306,45 +379,45 @@ main (void)
   memcpy (&p[1], swd_seq_jtag_to_swd, sizeof swd_seq_jtag_to_swd);
   pru_request_cmd (p);
 
-  /* READ_REG: IDCODE, idle=0 */
-  p[0] = 0x06 | (0xa5 << 8) | (0 << 24);
-  pru_request_cmd (p);
-  printf ("parity-ack= %08x\n", p[16]);
-  printf ("value = %08x\n", p[16+1]);
+  u = submit_read_cmd (p, DAP_IDCODE_RD);
+  printf ("DAP ID: %08x\n", u);
 
-  /* WRITE_REG: ABORT, idle=0 */
-  p[0] = 0x07 | (0x81 << 8) | (0 << 16) | (0 << 24);
-  p[1] = 0x1e;
-  pru_request_cmd (p);
-  printf ("ack= %08x\n", p[16]);
-
+  puts ("Abort (clear errors)");
+  submit_write_cmd (p, DAP_ABORT_WR, 0x0000001e);
   idle_cycle (p, 8);
 
-  /* WRITE_REG: SELECT, idle=0 */
-  p[0] = 0x07 | (0xb1 << 8) | (0 << 16) | (0 << 24);
-  p[1] = 0;
-  pru_request_cmd (p);
-  printf ("ack= %08x\n", p[16]);
+  /* Select memory access port bank 0 */
+  submit_write_cmd (p, DAP_SELECT_WR, 0x00000000);
 
-  /* WRITE_REG: STAT, idle=0, enable the debug hardware */
-  p[0] = 0x07 | (0xa9 << 8) | (1 << 16) | (0 << 24);
-  p[1] = 0x54000000;
-  pru_request_cmd (p);
-  printf ("ack= %08x\n", p[16]);
-
-  /* READ_REG: STAT, idle=0 */
-  p[0] = 0x06 | (0x8d << 8) | (0 << 24);
-  pru_request_cmd (p);
-  printf ("parity-ack= %08x\n", p[16]);
-  printf ("value = %08x\n", p[16+1]);
+  /* Enable the debug hardware */
+  submit_write_cmd (p, DAP_CTRLSTAT_WR, 0x54000000);
+  u = submit_read_cmd (p, DAP_CTRLSTAT_RD);
+  printf ("STAT: %08x\n", u);
 
   mcu_halt (p);
 
+  u = read_cpuid (p);
+  printf ("CPUID = %08x\n", u);
+
+  puts ("Read/Write register.");
   u = read_arm_reg (p, 0); 
   printf ("R0 value = %08x\n", u);
-  write_arm_reg (p, 0, 0xdeadbeaf); 
+  write_arm_reg (p, 0, 0xdeadbeaf);
   u = read_arm_reg (p, 0); 
   printf ("R0 value = %08x\n", u);
+
+  puts ("Read/Write SRAM at 0x20000000.");
+  u = read_mem (p, 0x20000000);
+  printf ("Value = %08x\n", u);
+  write_mem (p, 0x20000000, 0x12345678);
+  u = read_mem (p, 0x20000000);
+  printf ("Value = %08x\n", u);
+
+  puts ("Read flash memory at 0x08000000.");
+  u = read_mem (p, 0x08000000);
+  printf ("Value = %08x\n", u);
+
+  mcu_reset (p);
 
   /* Finally, celebrate with USR3 LED blinking.  */
   p[0] = 0x01;
