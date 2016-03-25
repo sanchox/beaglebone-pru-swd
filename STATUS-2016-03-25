@@ -1,0 +1,123 @@
+I found a major issue for PRU programming.  The shared memory cache
+coherency.
+
+It seems that host CPU accesses the memory of PRU with cache-enabled.
+
+I encounter severe issue when reading the result from PRU.
+In the output of TEST-PRU program, there is:
+
+    submit_read_cmd: parity-ack= 00000001, value=00030003
+    Reading register 0 on MCU...done
+    R0 value = 00000000
+    [...]
+    submit_read_cmd: parity-ack= 00000001, value=00000000
+    Reading register 0 on MCU...done
+    R0 value = deadbeaf
+
+
+To output the line of submit_read_cmd, it accesses p[16+1] memory,
+then again access same p[16+1], but the values are different for two
+accesses.  I think that it's because of cache.  My guess: after the
+cache line was invalidated by the effect of calling PRINTF function,
+the true value on PRU memory comes to host CPU, that's 00000000 (or
+deadbeaf).
+
+Note that this log was taken, after I put __clear_cache function.  I
+confirmed that __clear_cache function doesn't work for data cache
+invalidation, perhaps, it's for data cache flush and instruction
+cache invalidation.
+
+So, I put my own cacheflush function which (tries to) touch every
+cache lines so that it can invalidate all cache.
+
+After cacheflush, TEST-PRU works well.
+
+I also put cacheflush to bbg-swd driver for OpenOCD, but it doesn't
+work well yet.  It can access DP itself, but can't access memory of
+MCU, yet.
+
+======================= Fri Mar 25 06:01:10 2016  after __clear_cache.
+debian@beaglebone:~/w/t$ ./test-pru 
+Start testing PRUSS for SWD protocol
+Started execution of PRU-SWU program on PRUSS
+Request (00003405:ffffffff) done
+Request (00007605:ffffffff) done
+Request (0000a506:ffffffff) done
+parity-ack= 00000001
+value = 1ba01477
+Request (00008107:0000001e) done
+ack= 00000001
+Request (00000004:00000008) done
+Request (0000b107:00000000) done
+ack= 00000001
+Request (0001a907:54000000) done
+ack= 00000001
+Request (00008d06:54000000) done
+parity-ack= 00000001
+value = f4000040
+Halting MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:e000edf0) done
+submit_write_cmd: ack= 00000001
+Request (0801bb07:a05f0001) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:e000edfc) done
+submit_write_cmd: ack= 00000001
+Request (0801bb07:00000001) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:e000ed0c) done
+submit_write_cmd: ack= 00000001
+Request (0801bb07:fa050004) done
+submit_write_cmd: ack= 00000001
+Halting MCU...done
+Reading register 0 on MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf4) done
+submit_write_cmd: ack= 00000001
+Request (0800bb07:00000000) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf8) done
+submit_write_cmd: ack= 00000001
+Request (00009f06:e000edf8) done
+submit_read_cmd: parity-ack= 00000001, value=00030003
+Reading register 0 on MCU...done
+R0 value = 00000000
+Writing register 0 on MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf8) done
+submit_write_cmd: ack= 00000001
+Request (0801bb07:deadbeaf) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf4) done
+submit_write_cmd: ack= 00000001
+Request (0801bb07:00010000) done
+submit_write_cmd: ack= 00000001
+Writing register 0 on MCU...done
+Reading register 0 on MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf4) done
+submit_write_cmd: ack= 00000001
+Request (0800bb07:00000000) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf8) done
+submit_write_cmd: ack= 00000001
+Request (00009f06:e000edf8) done
+submit_read_cmd: parity-ack= 00000001, value=00000000
+Reading register 0 on MCU...done
+R0 value = deadbeaf
+Request (00000001:00800000) done
+Request (00000000:00800000) done
+=======================
+<--- This is fixed in 1e88ef9.  Now it works fine.
