@@ -1,4 +1,36 @@
-Access to ARM core (register read/write) works.
+Access to ARM core (register read) seems working.
+Writing register would not actually be done.
 
 Access to memory fails.
 Because of this, identification of MCU fails.
+
+For full debug log, please see the file: openocd-debug-log-20160325-00.log
+
+Access to the memory e000ed00 to identify MCU core, it resulted wrong
+value.
+
+The value is unstable.  There are other cases, it read as "cpuid: 0x00000000". 
+
+Debug: 337 313 arm_adi_v5.c:716 mem_ap_init(): MEM_AP Packed Transfers: enabled
+Debug: 338 313 arm_adi_v5.c:727 mem_ap_init(): MEM_AP CFG: large data 0, long address 0, big-endian 0
+Debug: 339 313 bbg-swd.c:282 bbg_swd_write_reg(): bbg_swd_write_reg
+Debug: 340 314 bbg-swd.c:47 pru_request_cmd(): BBD-SWD: command execution (0000b107:00000000)
+Debug: 341 314 bbg-swd.c:310 bbg_swd_write_reg(): OK DP write reg 8 = 00000000
+Debug: 342 314 bbg-swd.c:282 bbg_swd_write_reg(): bbg_swd_write_reg
+Debug: 343 314 bbg-swd.c:47 pru_request_cmd(): BBD-SWD: command execution (20018b07:e000ed00)
+Debug: 344 314 bbg-swd.c:310 bbg_swd_write_reg(): OK AP write reg 4 = e000ed00
+Debug: 345 315 bbg-swd.c:282 bbg_swd_write_reg(): bbg_swd_write_reg
+Debug: 346 315 bbg-swd.c:47 pru_request_cmd(): BBD-SWD: command execution (2001a307:a2000022)
+Debug: 347 315 bbg-swd.c:310 bbg_swd_write_reg(): OK AP write reg 0 = a2000022
+Debug: 348 315 bbg-swd.c:222 bbg_swd_read_reg(): bbg_swd_read_reg
+Debug: 349 315 bbg-swd.c:49 pru_request_cmd(): BBD-SWD: command execution (20009f06)
+Debug: 350 316 bbg-swd.c:252 bbg_swd_read_reg(): OK AP read reg C = 00000000
+Debug: 351 316 bbg-swd.c:222 bbg_swd_read_reg(): bbg_swd_read_reg
+Debug: 352 316 bbg-swd.c:49 pru_request_cmd(): BBD-SWD: command execution (0000bd06)
+Debug: 353 317 bbg-swd.c:252 bbg_swd_read_reg(): OK DP read reg C = b0c00000
+Debug: 354 317 bbg-swd.c:335 bbg_swd_run_queue(): bbg_swd_run_queue
+Debug: 355 317 bbg-swd.c:47 pru_request_cmd(): BBD-SWD: command execution (00000004:00000008)
+Debug: 356 317 bbg-swd.c:339 bbg_swd_run_queue(): SWD queue return value: 00
+Debug: 357 318 target.c:2226 target_read_u32(): address: 0xe000ed00, value: 0xb0c00000
+Debug: 358 318 cortex_m.c:1930 cortex_m_examine(): Cortex-M0 r12p0 processor detected
+Debug: 359 318 cortex_m.c:1931 cortex_m_examine(): cpuid: 0xb0c00000
