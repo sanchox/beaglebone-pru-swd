@@ -40,7 +40,7 @@
 static const uint8_t swd_seq_line_reset[] = {
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03
 };
-static const unsigned swd_seq_line_reset_len = 56;
+static const unsigned swd_seq_line_reset_len = 52;
 
 static const uint8_t swd_seq_jtag_to_swd[] = {
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7b, 0x9e,
@@ -58,7 +58,169 @@ pru_request_cmd (uint32_t *p)
   prussdrv_pru_wait_event (PRU_EVTOUT_0);
   prussdrv_pru_clear_event (PRU_EVTOUT_0, PRU0_ARM_INTERRUPT);
 
-  printf ("Request (%08x) done\n", *p);
+  printf ("Request (%08x:%08x) done\n", p[0], p[1]);
+}
+
+static void
+idle_cycle (uint32_t *p, int n)
+{
+  p[0] = 0x04;
+  p[1] = 8;
+  pru_request_cmd (p);
+}
+
+static const uint8_t even_parity_table[] = {
+  0x00, 0x10, 0x10, 0x00, 0x10, 0x00, 0x00, 0x10,
+  0x10, 0x00, 0x00, 0x10, 0x00, 0x10, 0x10, 0x00
+};
+
+static int
+parity_32 (uint32_t v)
+{
+  uint8_t e;
+
+  e = (v & 0xff);
+  e ^= ((v >> 8) & 0xff);
+  e ^= ((v >> 16) & 0xff);
+  e ^= ((v >> 24) & 0xff);
+  e ^= (e >> 4);
+  return even_parity_table[e&0x0f] != 0;
+}
+
+
+#define DAP_IDCODE_RD           0x02
+#define DAP_ABORT_WR            0x00
+#define DAP_CTRLSTAT_RD         0x06
+#define DAP_CTRLSTAT_WR         0x04
+#define DAP_SELECT_WR           0x08
+#define DAP_RDBUFF_RD           0x0E
+
+static uint8_t
+req_byte (uint8_t dap_addr)
+{
+  uint8_t req;
+
+  req = dap_addr & 0x0f;
+  req |= even_parity_table[req];
+  req <<= 1;
+  req |= 0x81;
+  return req;
+}
+
+static int
+ap_access (uint8_t dap_addr)
+{
+  return (dap_addr & 0x02) == 0;
+}
+
+static void
+submit_write_cmd (uint32_t *p, uint8_t dap_addr, uint32_t value)
+{
+  uint8_t delay = ap_access (dap_addr) ? 8 : 0;
+  uint8_t parity = parity_32 (value);
+
+  p[0] = 0x07 | (req_byte (dap_addr) << 8) | (parity << 16) | (delay << 24);
+  p[1] = value;
+  pru_request_cmd (p);
+  printf ("submit_write_cmd: ack= %08x\n", p[16]);
+}
+
+static uint32_t
+submit_read_cmd (uint32_t *p, uint8_t dap_addr)
+{
+  uint8_t delay = ap_access (dap_addr) ? 8 : 0;
+
+  p[0] = 0x06 | (req_byte (dap_addr) << 8) | (0 << 16) | (delay << 24);
+  pru_request_cmd (p);
+  printf ("submit_read_cmd: parity-ack= %08x, value=%08x\n", p[16], p[16+1]);
+  return p[16+1];
+}
+
+/* MEM-AP register addresses */
+#define MEM_AP_CSW  0x01
+#define MEM_AP_TAR  0x05
+#define MEM_AP_DRW_WR  0x0D
+#define MEM_AP_DRW_RD  0x0F
+
+/* Cortex M3 Debug Registers (AHB addresses) */
+#define DDFSR   0xE000ED30      /* Debug Fault StatusRegister                           */
+#define DHCSR   0xE000EDF0      /* Debug Halting Control and Status Register            */
+#define DCRSR   0xE000EDF4      /* Debug Core Register Selector Register                */
+#define DCRDR   0xE000EDF8      /* Debug Core Register Data Register                    */
+#define DEMCR   0xE000EDFC      /* Debug Exception and Monitor Control Register         */
+#define AIRCR   0xE000ED0C      /* The Application Interrupt and Reset Control Register */
+
+static void
+mcu_halt (uint32_t *p)
+{
+  puts ("Halting MCU...");
+
+  /* Select memory access port bank 0 */
+  submit_write_cmd (p, DAP_SELECT_WR, 0x00000000);
+
+  /* Specify 32 bit memory access, auto increment */
+  submit_write_cmd (p, MEM_AP_CSW, 0x23000002);
+
+  /* DHCSR.C_DEBUGEN = 1, C_HALT =1 */
+  submit_write_cmd (p, MEM_AP_TAR, DHCSR);
+  submit_write_cmd (p, MEM_AP_DRW_WR, 0xA05F0001);
+
+  /* DEMCR.VC_CORERESET = 1 */
+  submit_write_cmd (p, MEM_AP_TAR, DEMCR);
+  submit_write_cmd (p, MEM_AP_DRW_WR, 0x00000001);
+
+  /* Reset the core */
+  submit_write_cmd (p, MEM_AP_TAR, AIRCR);
+  submit_write_cmd (p, MEM_AP_DRW_WR, 0xFA050004);
+
+  puts ("Halting MCU...done");
+}
+
+static uint32_t 
+read_arm_reg (uint32_t *p, int n)
+{
+  uint32_t v;
+
+  printf ("Reading register %d on MCU...\n", n);
+
+  /* Select memory access port bank 0 */
+  submit_write_cmd (p, DAP_SELECT_WR, 0x00000000);
+
+  /* Specify 32 bit memory access, auto increment */
+  submit_write_cmd (p, MEM_AP_CSW, 0x23000002);
+
+  /* Write the register number to DCRSR */
+  submit_write_cmd (p, MEM_AP_TAR, DCRSR);
+  submit_write_cmd (p, MEM_AP_DRW_WR, n);
+
+  /* Read the value from DCRDR */
+  submit_write_cmd (p, MEM_AP_TAR, DCRDR);
+  v = submit_read_cmd (p, MEM_AP_DRW_RD);
+
+  printf ("Reading register %d on MCU...done\n", n);
+  return v;
+}
+
+static void
+write_arm_reg  (uint32_t *p, int n, uint32_t value)
+{
+  printf ("Writing register %d on MCU...\n", n);
+
+  /* Select memory access port bank 0 */
+  submit_write_cmd (p, DAP_SELECT_WR, 0x00000000);
+
+  /* Specify 32 bit memory access, auto increment */
+  submit_write_cmd (p, MEM_AP_CSW, 0x23000002);
+
+  /* Write the value to DCRDR */
+  submit_write_cmd (p, MEM_AP_TAR, DCRDR);
+  submit_write_cmd (p, MEM_AP_DRW_WR, value);
+
+  /* Write the register number to DCRSR */
+  submit_write_cmd (p, MEM_AP_TAR, DCRSR);
+  submit_write_cmd (p, MEM_AP_DRW_WR, n | 0x10000);
+
+  printf ("Writing register %d on MCU...done\n", n);
 }
 
 
@@ -69,6 +231,7 @@ main (void)
   tpruss_intc_initdata pruss_intc_initdata = PRUSS_INTC_INITDATA;
   void *pru_data_ram;
   uint32_t *p;
+  uint32_t u;
 
   puts ("Start testing PRUSS for SWD protocol");
 
@@ -120,12 +283,7 @@ main (void)
   pru_request_cmd (p);
   printf ("ack= %08x\n", p[16]);
 
-  /*
-   * IDLE
-   */
-  p[0] = 0x04;
-  p[1] = 8;
-  pru_request_cmd (p);
+  idle_cycle (p, 8);
 
   /* WRITE_REG: SELECT, idle=0 */
   p[0] = 0x07 | (0xb1 << 8) | (0 << 16) | (0 << 24);
@@ -133,7 +291,7 @@ main (void)
   pru_request_cmd (p);
   printf ("ack= %08x\n", p[16]);
 
-  /* WRITE_REG: STAT, idle=0 */
+  /* WRITE_REG: STAT, idle=0, enable the debug hardware */
   p[0] = 0x07 | (0xa9 << 8) | (1 << 16) | (0 << 24);
   p[1] = 0x54000000;
   pru_request_cmd (p);
@@ -144,6 +302,14 @@ main (void)
   pru_request_cmd (p);
   printf ("parity-ack= %08x\n", p[16]);
   printf ("value = %08x\n", p[16+1]);
+
+  mcu_halt (p);
+
+  u = read_arm_reg (p, 0); 
+  printf ("R0 value = %08x\n", u);
+  write_arm_reg (p, 0, 0xdeadbeaf); 
+  u = read_arm_reg (p, 0); 
+  printf ("R0 value = %08x\n", u);
 
   /* Finally, celebrate with USR3 LED blinking.  */
   p[0] = 0x01;
