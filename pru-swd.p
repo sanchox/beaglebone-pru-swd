@@ -396,9 +396,9 @@ label_done:
 .macro	READ_SWD_DIO_BIT
 .mparam	rx, ry, label_1, label_done, shift=1
 	DRIVE_CLK_LOW
-	LSR	rx, rx, shift
-	LBBO	ry, r5, GPIO_DATAIN, 4
 	DELAY
+	LBBO	ry, r5, GPIO_DATAIN, 4
+	LSR	rx, rx, shift
 	DRIVE_CLK_HIGH
 	QBBS	label_1, ry, SWD_DIO_BIT
 	QBA	label_done
