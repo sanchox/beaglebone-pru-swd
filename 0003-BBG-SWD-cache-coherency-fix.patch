@@ -1,0 +1,70 @@
+From 6d9ee6a32a97262874ce74af6eda2a752c996e64 Mon Sep 17 00:00:00 2001
+From: NIIBE Yutaka <gniibe@fsij.org>
+Date: Fri, 25 Mar 2016 06:53:41 +0000
+Subject: [PATCH 3/3] BBG-SWD: cache coherency fix.
+
+* src/jtag/drivers/bbg-swd.c (cacheflush): New.
+(pru_request_cmd) Call cacheflush.
+---
+ src/jtag/drivers/bbg-swd.c | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+
+diff --git a/src/jtag/drivers/bbg-swd.c b/src/jtag/drivers/bbg-swd.c
+index 0363f45..b3e8d18 100644
+--- a/src/jtag/drivers/bbg-swd.c
++++ b/src/jtag/drivers/bbg-swd.c
+@@ -35,10 +35,43 @@ extern struct jtag_interface *jtag_interface;
+ static void bbg_swd_write_reg(uint8_t cmd, uint32_t value, uint32_t ap_delay_clk);
+ static int bbg_swd_switch_seq(enum swd_special_seq seq);
+ 
++static void
++cacheflush (void)
++{
++	static uint32_t my_mem[65536];
++	int i;
++
++	/*
++	 * __clear_cache doesn't work with unknown reason.
++	 * So, I write this function to invalidate data cache.
++	 */
++	asm volatile ("" : : "r" (my_mem) : "memory"); /* my_mem is in use */
++	for (i = 0; i < 65536; i++)
++		my_mem[i] = my_mem[(i+1)&65536];
++}
++
+ static void pru_request_cmd(uint32_t *p)
+ {
++	/* 
++	 * Memory is shared between Main CPU and PRUs.
++	 * 
++	 * (1) We need to avoid confusing the compiler as if the memory is
++	 *     usual one.  To do so, we put asm with "memory" clobber.
++	 *     This is to ensure register value to be on the memory.
++	 *
++	 * (2) In case data could be on cache and not yet onto the memory,
++	 *     we place calling to cacheflush function.
++	 */
++	asm volatile ("" : : : "memory");
++	cacheflush ();
++
+ 	/* Wakeup the PRU0 which sleeps.  */
+ 	prussdrv_pru_send_event(ARM_PRU0_INTERRUPT);
++	/*
++	 * prussdrv_pru_send_event may be buggy, I only see the write access
++	 * to memory, but no cache flushing.  Just in case if it has an issue...
++	 */
++	cacheflush ();
+ 
+ 	/* Wait PRU0 response.  */
+ 	prussdrv_pru_wait_event(PRU_EVTOUT_0);
+@@ -47,6 +80,7 @@ static void pru_request_cmd(uint32_t *p)
+ 		LOG_DEBUG("BBD-SWD: command execution (%08x:%08x)", p[0], p[1]);
+ 	else
+ 		LOG_DEBUG("BBD-SWD: command execution (%08x)", p[0]);
++	cacheflush ();
+ }
+ 
+ static int queued_retval;
+-- 
+2.1.4
+
