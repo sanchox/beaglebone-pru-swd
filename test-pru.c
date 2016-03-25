@@ -48,17 +48,52 @@ static const uint8_t swd_seq_jtag_to_swd[] = {
 };
 static const unsigned swd_seq_jtag_to_swd_len = 118;
 
+uint32_t my_mem[65536];
+
+static void
+cacheflush (void)
+{
+  int i;
+
+  /*
+   * __clear_cache doesn't work with unknown reason.
+   * So, I write this function to invalidate data cache.
+   */
+  asm volatile ("" : : "r" (my_mem) : "memory"); /* my_mem is in use */
+  for (i = 0; i < 65536; i++)
+    my_mem[i] = my_mem[(i+1)&65536];
+}
+
 static void
 pru_request_cmd (uint32_t *p)
 {
+  /* 
+   * Memory is shared between Main CPU and PRUs.
+   * 
+   * (1) We need to avoid confusing the compiler as if the memory is
+   *     usual one.  To do so, we put asm with "memory" clobber.
+   *     This is to ensure register value to be on the memory.
+   *
+   * (2) In case data could be on cache and not yet onto the memory,
+   *     we place calling to cacheflush function.
+   */
+  asm volatile ("" : : : "memory");
+  cacheflush ();
+
   /* Wakeup the PRU0 which sleeps.  */
   prussdrv_pru_send_event (ARM_PRU0_INTERRUPT);
+  /*
+   * prussdrv_pru_send_event may be buggy, I only see the write access
+   * to memory, but no cache flushing.
+   */
+  cacheflush ();
 
   /* Wait PRU0 response.  */
   prussdrv_pru_wait_event (PRU_EVTOUT_0);
   prussdrv_pru_clear_event (PRU_EVTOUT_0, PRU0_ARM_INTERRUPT);
 
   printf ("Request (%08x:%08x) done\n", p[0], p[1]);
+  cacheflush ();
 }
 
 static void
