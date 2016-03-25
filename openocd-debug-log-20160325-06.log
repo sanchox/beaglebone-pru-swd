@@ -1,5 +1,5 @@
 Script started on Fri 25 Mar 2016 07:06:17 AM UTC
-root@beaglebone:/home/debian# ./w/openocd/src/openocd -d 9 -f p.cfg -f target/stm32f1x.cfg[H[2Jroot@beaglebone:/home/debian# ./w/openocd/src/openocd -d 9 -f p.cfg -f target/stm32f1x.cfg
+root@beaglebone:/home/debian# ./w/openocd/src/openocd -d 9 -f p.cfg -f target/stm32f1x.cfg
 Open On-Chip Debugger 0.10.0-dev-00247-g73b676c-dirty (2016-03-19-09:56)
 Licensed under GNU GPL v2
 For bug reports, read

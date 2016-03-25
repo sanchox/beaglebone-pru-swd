@@ -1,0 +1,472 @@
+Current status
+
+Summary
+=======
+
+* PRU Program seems work well
+
+* Host program has issues.
+
+  * Test program works well (except the first invocaiton).
+    The functionality of PRU program has been confirmed.
+
+  * OpenOCD BBG-SWD driver works somehow, but not work well yet.
+
+  * At the last stage, I found a cache coherency issue for uio-pruss.
+    Perhaps, there are other issues to solve, to achieve working
+    BBG-SWD driver.
+
+
+Detail
+======
+
+By the test program "test-pru.c", it is confirmed that it works for:
+
+  (1) MCU halt
+
+  (2) Getting IDs
+
+	DAP ID= 1ba01477
+	CPUID = 411fc231
+
+  (3) Read/Write register R0
+
+  (4) Read/Write SRAM at 0x20000000
+
+  (5) Reading Flash memory at 0x08000000
+
+  (6) MCU reset
+
+Here is the log.  The first invocation resulted
+FAULT when it tried MCU halt.  But, from next
+invocation, it works fine. 
+
+======================= Fri Mar 25 20:12:13 2016
+debian@beaglebone:~/w/t$ ./test-pru 
+Start testing PRUSS for SWD protocol
+Started execution of PRU-SWU program on PRUSS
+Request (00003405:ffffffff) done
+Request (00007605:ffffffff) done
+Request (0000a506:ffffffff) done
+submit_read_cmd: parity-ack= 00000001, value=1ba01477
+DAP ID: 1ba01477
+Abort (clear errors)
+Request (08008107:0000001e) done
+submit_write_cmd: ack= 00000001
+Request (00000004:00000008) done
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0801a907:54000000) done
+submit_write_cmd: ack= 00000001
+Request (00008d06:54000000) done
+submit_read_cmd: parity-ack= 80000001, value=f4000000
+STAT: f4000000
+Halting MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:e000edf0) done
+submit_write_cmd: ack= 00000001
+Request (0800bb07:a05f0003) done
+submit_write_cmd: ack= 00000007
+Halting MCU...done
+Reading MCU ID...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000007
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000007
+Request (08018b07:e000ed00) done
+submit_write_cmd: ack= 00000007
+Request (00009f06:e000ed00) done
+submit_read_cmd: parity-ack= 80000007, value=ffffffff
+Reading MCU ID...done
+CPUID = ffffffff
+Read/Write register.
+Reading register 0 on MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000007
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000007
+Request (08008b07:e000edf4) done
+submit_write_cmd: ack= 00000007
+Request (0800bb07:00000000) done
+submit_write_cmd: ack= 00000007
+Request (08008b07:e000edf8) done
+submit_write_cmd: ack= 00000007
+Request (00009f06:e000edf8) done
+submit_read_cmd: parity-ack= 80000007, value=ffffffff
+Reading register 0 on MCU...done
+R0 value = ffffffff
+Writing register 0 on MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000007
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000007
+Request (08008b07:e000edf8) done
+submit_write_cmd: ack= 00000007
+Request (0801bb07:deadbeaf) done
+submit_write_cmd: ack= 00000007
+Request (08008b07:e000edf4) done
+submit_write_cmd: ack= 00000007
+Request (0801bb07:00010000) done
+submit_write_cmd: ack= 00000007
+Writing register 0 on MCU...done
+Reading register 0 on MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000007
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000007
+Request (08008b07:e000edf4) done
+submit_write_cmd: ack= 00000007
+Request (0800bb07:00000000) done
+submit_write_cmd: ack= 00000007
+Request (08008b07:e000edf8) done
+submit_write_cmd: ack= 00000007
+Request (00009f06:e000edf8) done
+submit_read_cmd: parity-ack= 80000007, value=ffffffff
+Reading register 0 on MCU...done
+R0 value = ffffffff
+Read/Write SRAM at 0x20000000.
+Reading memory 20000000...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000007
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000007
+Request (08018b07:20000000) done
+submit_write_cmd: ack= 00000007
+Request (00009f06:20000000) done
+submit_read_cmd: parity-ack= 80000007, value=ffffffff
+Reading memory 20000000...done
+Value = ffffffff
+Writing memory 20000000 on MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000007
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000007
+Request (08018b07:20000000) done
+submit_write_cmd: ack= 00000007
+Request (0801bb07:12345678) done
+submit_write_cmd: ack= 00000007
+Writing memory 20000000 on MCU...
+Reading memory 20000000...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000007
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000007
+Request (08018b07:20000000) done
+submit_write_cmd: ack= 00000007
+Request (00009f06:20000000) done
+submit_read_cmd: parity-ack= 80000007, value=ffffffff
+Reading memory 20000000...done
+Value = ffffffff
+Read flash memory at 0x08000000.
+Reading memory 08000000...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000007
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000007
+Request (08018b07:08000000) done
+submit_write_cmd: ack= 00000007
+Request (00009f06:08000000) done
+submit_read_cmd: parity-ack= 80000007, value=ffffffff
+Reading memory 08000000...done
+Value = ffffffff
+Reseting MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000007
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000007
+Request (08018b07:e000ed0c) done
+submit_write_cmd: ack= 00000007
+Request (0801bb07:05fa0004) done
+submit_write_cmd: ack= 00000007
+Reseting MCU...done
+Request (00000001:00800000) done
+Request (00000000:00800000) done
+debian@beaglebone:~/w/t$ ./test-pru 
+Start testing PRUSS for SWD protocol
+Started execution of PRU-SWU program on PRUSS
+Request (00003405:ffffffff) done
+Request (00007605:ffffffff) done
+Request (0000a506:ffffffff) done
+submit_read_cmd: parity-ack= 00000001, value=1ba01477
+DAP ID: 1ba01477
+Abort (clear errors)
+Request (08008107:0000001e) done
+submit_write_cmd: ack= 00000001
+Request (00000004:00000008) done
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0801a907:54000000) done
+submit_write_cmd: ack= 00000001
+Request (00008d06:54000000) done
+submit_read_cmd: parity-ack= 80000001, value=f4000000
+STAT: f4000000
+Halting MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:e000edf0) done
+submit_write_cmd: ack= 00000001
+Request (0800bb07:a05f0003) done
+submit_write_cmd: ack= 00000001
+Halting MCU...done
+Reading MCU ID...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:e000ed00) done
+submit_write_cmd: ack= 00000001
+Request (00009f06:e000ed00) done
+submit_read_cmd: parity-ack= 80000001, value=411fc231
+Reading MCU ID...done
+CPUID = 411fc231
+Read/Write register.
+Reading register 0 on MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf4) done
+submit_write_cmd: ack= 00000001
+Request (0800bb07:00000000) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf8) done
+submit_write_cmd: ack= 00000001
+Request (00009f06:e000edf8) done
+submit_read_cmd: parity-ack= 00000001, value=00000000
+Reading register 0 on MCU...done
+R0 value = 00000000
+Writing register 0 on MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf8) done
+submit_write_cmd: ack= 00000001
+Request (0801bb07:deadbeaf) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf4) done
+submit_write_cmd: ack= 00000001
+Request (0801bb07:00010000) done
+submit_write_cmd: ack= 00000001
+Writing register 0 on MCU...done
+Reading register 0 on MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf4) done
+submit_write_cmd: ack= 00000001
+Request (0800bb07:00000000) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf8) done
+submit_write_cmd: ack= 00000001
+Request (00009f06:e000edf8) done
+submit_read_cmd: parity-ack= 80000001, value=deadbeaf
+Reading register 0 on MCU...done
+R0 value = deadbeaf
+Read/Write SRAM at 0x20000000.
+Reading memory 20000000...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:20000000) done
+submit_write_cmd: ack= 00000001
+Request (00009f06:20000000) done
+submit_read_cmd: parity-ack= 00000001, value=0e618acd
+Reading memory 20000000...done
+Value = 0e618acd
+Writing memory 20000000 on MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:20000000) done
+submit_write_cmd: ack= 00000001
+Request (0801bb07:12345678) done
+submit_write_cmd: ack= 00000001
+Writing memory 20000000 on MCU...
+Reading memory 20000000...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:20000000) done
+submit_write_cmd: ack= 00000001
+Request (00009f06:20000000) done
+submit_read_cmd: parity-ack= 80000001, value=12345678
+Reading memory 20000000...done
+Value = 12345678
+Read flash memory at 0x08000000.
+Reading memory 08000000...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:08000000) done
+submit_write_cmd: ack= 00000001
+Request (00009f06:08000000) done
+submit_read_cmd: parity-ack= 80000001, value=20005000
+Reading memory 08000000...done
+Value = 20005000
+Reseting MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:e000ed0c) done
+submit_write_cmd: ack= 00000001
+Request (0801bb07:05fa0004) done
+submit_write_cmd: ack= 00000001
+Reseting MCU...done
+Request (00000001:00800000) done
+Request (00000000:00800000) done
+debian@beaglebone:~/w/t$ ./test-pru 
+Start testing PRUSS for SWD protocol
+Started execution of PRU-SWU program on PRUSS
+Request (00003405:ffffffff) done
+Request (00007605:ffffffff) done
+Request (0000a506:ffffffff) done
+submit_read_cmd: parity-ack= 00000001, value=1ba01477
+DAP ID: 1ba01477
+Abort (clear errors)
+Request (08008107:0000001e) done
+submit_write_cmd: ack= 00000001
+Request (00000004:00000008) done
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0801a907:54000000) done
+submit_write_cmd: ack= 00000001
+Request (00008d06:54000000) done
+submit_read_cmd: parity-ack= 00000001, value=f4000040
+STAT: f4000040
+Halting MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:e000edf0) done
+submit_write_cmd: ack= 00000001
+Request (0800bb07:a05f0003) done
+submit_write_cmd: ack= 00000001
+Halting MCU...done
+Reading MCU ID...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:e000ed00) done
+submit_write_cmd: ack= 00000001
+Request (00009f06:e000ed00) done
+submit_read_cmd: parity-ack= 80000001, value=411fc231
+Reading MCU ID...done
+CPUID = 411fc231
+Read/Write register.
+Reading register 0 on MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf4) done
+submit_write_cmd: ack= 00000001
+Request (0800bb07:00000000) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf8) done
+submit_write_cmd: ack= 00000001
+Request (00009f06:e000edf8) done
+submit_read_cmd: parity-ack= 00000001, value=00000000
+Reading register 0 on MCU...done
+R0 value = 00000000
+Writing register 0 on MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf8) done
+submit_write_cmd: ack= 00000001
+Request (0801bb07:deadbeaf) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf4) done
+submit_write_cmd: ack= 00000001
+Request (0801bb07:00010000) done
+submit_write_cmd: ack= 00000001
+Writing register 0 on MCU...done
+Reading register 0 on MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf4) done
+submit_write_cmd: ack= 00000001
+Request (0800bb07:00000000) done
+submit_write_cmd: ack= 00000001
+Request (08008b07:e000edf8) done
+submit_write_cmd: ack= 00000001
+Request (00009f06:e000edf8) done
+submit_read_cmd: parity-ack= 80000001, value=deadbeaf
+Reading register 0 on MCU...done
+R0 value = deadbeaf
+Read/Write SRAM at 0x20000000.
+Reading memory 20000000...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:20000000) done
+submit_write_cmd: ack= 00000001
+Request (00009f06:20000000) done
+submit_read_cmd: parity-ack= 80000001, value=12345678
+Reading memory 20000000...done
+Value = 12345678
+Writing memory 20000000 on MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:20000000) done
+submit_write_cmd: ack= 00000001
+Request (0801bb07:12345678) done
+submit_write_cmd: ack= 00000001
+Writing memory 20000000 on MCU...
+Reading memory 20000000...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:20000000) done
+submit_write_cmd: ack= 00000001
+Request (00009f06:20000000) done
+submit_read_cmd: parity-ack= 80000001, value=12345678
+Reading memory 20000000...done
+Value = 12345678
+Read flash memory at 0x08000000.
+Reading memory 08000000...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:08000000) done
+submit_write_cmd: ack= 00000001
+Request (00009f06:08000000) done
+submit_read_cmd: parity-ack= 80000001, value=20005000
+Reading memory 08000000...done
+Value = 20005000
+Reseting MCU...
+Request (0800b107:00000000) done
+submit_write_cmd: ack= 00000001
+Request (0800a307:23000002) done
+submit_write_cmd: ack= 00000001
+Request (08018b07:e000ed0c) done
+submit_write_cmd: ack= 00000001
+Request (0801bb07:05fa0004) done
+submit_write_cmd: ack= 00000001
+Reseting MCU...done
+Request (00000001:00800000) done
+Request (00000000:00800000) done
+debian@beaglebone:~/w/t$ 
+=======================
