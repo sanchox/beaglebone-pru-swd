@@ -331,7 +331,7 @@ COMMAND_LOOP:
 	// Clear the event
 	MOV	r1, #INTC
 	LDI	r2, #ARM_PRU0_INTERRUPT
-	SBCO	r2, r1, SICR, 4
+	SBBO	r2, r1, INTC_SICR, 4
 	
 	// Load values from data RAM into register R0
 	LBCO	r0, CT_PRUDRAM, 0, 1
