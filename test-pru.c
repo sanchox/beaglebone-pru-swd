@@ -72,7 +72,10 @@ pru_request_cmd (uint32_t *p)
   prussdrv_pru_wait_event (PRU_EVTOUT_0);
   prussdrv_pru_clear_event (PRU_EVTOUT_0, PRU0_ARM_INTERRUPT);
 
-  printf ("Request (%08x:%08x) done\n", p[0], p[1]);
+  if ((p[0] & 0xff) == 0x07 && ((p[0] >> 8) & 0x04) == 0)
+    printf ("Request (%08x:%08x) done: %d\n", p[0], p[1], p[18]);
+  else
+    printf ("Request (%08x) done: %d\n", p[0], p[18]);
 }
 
 static void
@@ -124,7 +127,7 @@ req_byte (uint8_t dap_addr)
 static int
 ap_access (uint8_t dap_addr)
 {
-  return (dap_addr & 0x02) == 0;
+  return (dap_addr & 0x01) != 0;
 }
 
 static void
@@ -140,14 +143,19 @@ submit_write_cmd (uint32_t *p, uint8_t dap_addr, uint32_t value)
 }
 
 static uint32_t
-submit_read_cmd (uint32_t *p, uint8_t dap_addr)
+submit_read_cmd_with_delay (uint32_t *p, uint8_t dap_addr, uint8_t delay)
 {
-  uint8_t delay = ap_access (dap_addr) ? 8 : 0;
-
   p[0] = 0x06 | (req_byte (dap_addr) << 8) | (0 << 16) | (delay << 24);
   pru_request_cmd (p);
   printf ("submit_read_cmd: parity-ack= %08x, value=%08x\n", p[16], p[16+1]);
   return p[16+1];
+}
+
+static uint32_t
+submit_read_cmd (uint32_t *p, uint8_t dap_addr)
+{
+  uint8_t delay = ap_access (dap_addr) ? 8 : 0;
+  return submit_read_cmd_with_delay (p, dap_addr, delay);
 }
 
 /* MEM-AP register addresses */
@@ -174,7 +182,7 @@ mcu_halt (uint32_t *p)
   /* Select memory access port bank 0 */
   submit_write_cmd (p, DAP_SELECT_WR, 0x00000000);
 
-  /* Specify 32 bit memory access, auto increment */
+  /* Specify 32 bit memory access */
   submit_write_cmd (p, MEM_AP_CSW, 0x23000002);
 
   /* DHCSR.C_DEBUGEN = 1, C_HALT =1 */
@@ -192,7 +200,7 @@ mcu_reset (uint32_t *p)
   /* Select memory access port bank 0 */
   submit_write_cmd (p, DAP_SELECT_WR, 0x00000000);
 
-  /* Specify 32 bit memory access, auto increment */
+  /* Specify 32 bit memory access */
   submit_write_cmd (p, MEM_AP_CSW, 0x23000002);
 
   /* Reset the core */
@@ -212,12 +220,12 @@ read_cpuid (uint32_t *p)
   /* Select memory access port bank 0 */
   submit_write_cmd (p, DAP_SELECT_WR, 0x00000000);
 
-  /* Specify 32 bit memory access, auto increment */
+  /* Specify 32 bit memory access */
   submit_write_cmd (p, MEM_AP_CSW, 0x23000002);
 
   /* Read the value from CPUID */
   submit_write_cmd (p, MEM_AP_TAR, CPUID);
-  v = submit_read_cmd (p, MEM_AP_DRW_RD);
+  v = submit_read_cmd_with_delay (p, MEM_AP_DRW_RD, 0xff);
 
   puts ("Reading MCU ID...done");
   return v;
@@ -233,7 +241,7 @@ read_arm_reg (uint32_t *p, int n)
   /* Select memory access port bank 0 */
   submit_write_cmd (p, DAP_SELECT_WR, 0x00000000);
 
-  /* Specify 32 bit memory access, auto increment */
+  /* Specify 32 bit memory access */
   submit_write_cmd (p, MEM_AP_CSW, 0x23000002);
 
   /* Write the register number to DCRSR */
@@ -256,7 +264,7 @@ write_arm_reg  (uint32_t *p, int n, uint32_t value)
   /* Select memory access port bank 0 */
   submit_write_cmd (p, DAP_SELECT_WR, 0x00000000);
 
-  /* Specify 32 bit memory access, auto increment */
+  /* Specify 32 bit memory access */
   submit_write_cmd (p, MEM_AP_CSW, 0x23000002);
 
   /* Write the value to DCRDR */
@@ -281,7 +289,7 @@ read_mem (uint32_t *p, uint32_t addr)
   /* Select memory access port bank 0 */
   submit_write_cmd (p, DAP_SELECT_WR, 0x00000000);
 
-  /* Specify 32 bit memory access, auto increment */
+  /* Specify 32 bit memory access */
   submit_write_cmd (p, MEM_AP_CSW, 0x23000002);
 
   /* Read from ADDR */
@@ -300,7 +308,7 @@ write_mem  (uint32_t *p, uint32_t addr, uint32_t value)
   /* Select memory access port bank 0 */
   submit_write_cmd (p, DAP_SELECT_WR, 0x00000000);
 
-  /* Specify 32 bit memory access, auto increment */
+  /* Specify 32 bit memory access */
   submit_write_cmd (p, MEM_AP_CSW, 0x23000002);
 
   /* Write the value to ADDR */

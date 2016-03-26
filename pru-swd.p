@@ -146,6 +146,11 @@ START:
 	MOV	r0, #PRU0_CTRL
 	MOV	r1, #0xffffffff
 	SBBO	r1, r0, WAKEUP_EN, 4
+
+	// Clear the counter
+	LDI	r0, #0
+	SBCO	r0, CT_PRUDRAM, 72, 4
+
 	QBA	COMMAND_LOOP
 
 //
@@ -322,17 +327,23 @@ L_SIG_GEN_DONE:
 
 ///////////////////////////////////////////////////////////////////////////
 COMMAND_DONE:
-	MOV	r31.b0, PRU0_ARM_INTERRUPT+16
-	//
-COMMAND_LOOP:
-	// Wait until host wakes up PRU0
-	SLP	1
+	// Increment the counter
+	LBCO	r0, CT_PRUDRAM, 72, 4
+	ADD	r0, r0, #1
+	SBCO	r0, CT_PRUDRAM, 72, 4
 
 	// Clear the event
 	MOV	r1, #INTC
 	LDI	r2, #ARM_PRU0_INTERRUPT
 	SBBO	r2, r1, INTC_SICR, 4
-	
+
+	// Notify Host
+	MOV	r31.b0, PRU0_ARM_INTERRUPT+16
+
+COMMAND_LOOP:
+	// Wait until host wakes up PRU0
+	SLP	1
+
 	// Load values from data RAM into register R0
 	LBCO	r0, CT_PRUDRAM, 0, 1
 
