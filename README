@@ -1,7 +1,7 @@
 BeagleBoneGreen SWD - a practical tool for computing freedom
 
-					    Non-release-Version 0.00
-							  2016-03-25
+					    		Version 0.01
+							  2016-03-26
 							Niibe Yutaka
 					     Flying Stone Technology
 
@@ -12,26 +12,28 @@ BeagleBoneGreen SWD (BBG-SWD) is a tool to control SWD protocol by
 BeagleBoneGreen.
 
 
-***The development status***
-============================
+Note for Initial Release 
+========================
 
 The program on PRUSS (Programmable Realtime Unit SubSytem), PRU-SWD,
-is complete.  It is tested with the host program, test-pru.c.
+is complete.
 
-The BBG-SWD driver for OpenOCD is by those patches:
+The BBG-SWD driver for OpenOCD is by a patch:
 
 	0001-initial-patch-for-BBG-SWD.patch
-	0002-minor-tweak-for-BBG-SWG.patch
-	0003-BBG-SWD-cache-coherency-fix.patch
 
-The BBG-SWD driver is not yet ready for use.  It works somehow, from
-the viewpoint of lower-level SWD communications, but it doesn't work
-as a tool yet.  Debugging to identify issue(s) is still needed.
+The BBG-SWD driver is ready for use.
 
-For detail, please see:
+To see how it works in detail , please see the debug log of OpenOCD:
 
-	STATUS-2016-03-25-B
-	openocd-debug-log-20160325-06.log
+	flash-write-with-bbg-swd-20160326.log
+
+
+Future Works
+============
+
+The reset pin control by SRST is not yet implemented, as FST-01
+doesn't have the pin.  It's easy to implement.
 
 
 The purpose
