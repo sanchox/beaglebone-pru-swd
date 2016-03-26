@@ -34,6 +34,7 @@
 
 
 #define PRU0_ARM_INTERRUPT	19
+#define ARM_PRU0_INTERRUPT      21
 
 // Constant Table
 #define CT_PRUCFG	C4
@@ -46,6 +47,10 @@
 // PRU CFG registers
 #define SYSCFG		4 // offset
 #define STANDBY_INIT	4 // bit
+
+// PRU INTC registers
+#define INTC	  0x00020000	// address
+#define INTC_SICR	0x24	// offset
 
 // P8_11 GPIO1_13 GPIO_45 SWD_DIO
 // P8_12 GPIO1_12 GPIO_44 SWD_CLK
@@ -323,6 +328,11 @@ COMMAND_LOOP:
 	// Wait until host wakes up PRU0
 	SLP	1
 
+	// Clear the event
+	MOV	r1, #INTC
+	LDI	r2, #ARM_PRU0_INTERRUPT
+	SBCO	r2, r1, SICR, 4
+	
 	// Load values from data RAM into register R0
 	LBCO	r0, CT_PRUDRAM, 0, 1
 
