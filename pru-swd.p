@@ -34,7 +34,7 @@
 
 
 #define PRU0_ARM_INTERRUPT	19
-#define ARM_PRU0_INTERRUPT      21
+#define ARM_PRU0_INTERRUPT	21
 
 // Constant Table
 #define CT_PRUCFG	C4
@@ -55,6 +55,7 @@
 // P8_11 GPIO1_13 GPIO_45 SWD_DIO
 // P8_12 GPIO1_12 GPIO_44 SWD_CLK
 // P8_15 GPIO1_15 GPIO_47 nRST
+#define SWD_NRST_BIT 15
 #define SWD_DIO_BIT 13
 #define SWD_CLK_BIT 12
 #define SWD_DIO (1<<SWD_DIO_BIT)
@@ -133,11 +134,14 @@ START:
 	LDI	r6, #SWD_DIO
 	LDI	r7, #SWD_CLK
 
-	// Initialize SWD_DIO and SWD_CLK pins
+	// Initialize NRST, SWD_DIO and SWD_CLK pins
 	DRIVE_DIO_HIGH
 	DRIVE_CLK_HIGH
-	// SWD_DIO_oe <= Output, SWD_CLK_oe <= Output
+	// NRST_oe <= Output
+	// SWD_DIO_oe <= Output
+	// SWD_CLK_oe <= Output
 	LBBO	r0, r5, GPIO_OE, 4
+	CLR	r0, SWD_NRST_BIT
 	CLR	r0, SWD_DIO_BIT
 	CLR	r0, SWD_CLK_BIT
 	SBBO	r0, r5, GPIO_OE, 4
