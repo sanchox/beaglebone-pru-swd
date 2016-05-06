@@ -1,15 +1,15 @@
-From ee1d60eba7f9c35571241c1da4c8175c8b98daa1 Mon Sep 17 00:00:00 2001
+From 21ce5560ed49e9e929c2f266668b0030b21d2e27 Mon Sep 17 00:00:00 2001
 From: NIIBE Yutaka <gniibe@fsij.org>
-Date: Tue, 22 Mar 2016 03:06:37 +0000
-Subject: [PATCH 1/2] initial patch for BBG-SWD
+Date: Fri, 6 May 2016 02:24:10 +0000
+Subject: [PATCH] Add new SWD driver: bbg-swd
 
 ---
  configure.ac                 |  13 ++
  src/jtag/drivers/Makefile.am |   3 +
- src/jtag/drivers/bbg-swd.c   | 444 +++++++++++++++++++++++++++++++++++++++++++
+ src/jtag/drivers/bbg-swd.c   | 408 +++++++++++++++++++++++++++++++++++++++++++
  src/jtag/drivers/bbg-swd.h   |  44 +++++
  src/jtag/interfaces.c        |   6 +
- 5 files changed, 510 insertions(+)
+ 5 files changed, 474 insertions(+)
  create mode 100644 src/jtag/drivers/bbg-swd.c
  create mode 100644 src/jtag/drivers/bbg-swd.h
 
@@ -67,10 +67,10 @@ index 2aaf8fd..4a87324 100644
  	bitbang.h \
 diff --git a/src/jtag/drivers/bbg-swd.c b/src/jtag/drivers/bbg-swd.c
 new file mode 100644
-index 0000000..0363f45
+index 0000000..4d9a636
 --- /dev/null
 +++ b/src/jtag/drivers/bbg-swd.c
-@@ -0,0 +1,444 @@
+@@ -0,0 +1,408 @@
 +/***************************************************************************
 + *   Copyright (C) 2016  Flying Stone Technology                           *
 + *   Author: NIIBE Yutaka <gniibe@fsij.org>                                *
@@ -177,11 +177,7 @@ index 0000000..0363f45
 +}
 +
 +
-+static int bbg_swd_gpio_srst(int on)
-+{
-+	/* XXX: not yet implemented */
-+	return ERROR_OK;
-+}
++static void bbg_swd_gpio_srst(int on);
 +
 +static bool swd_mode;
 +
@@ -198,9 +194,7 @@ index 0000000..0363f45
 +
 +	if (jtag_reset_config & RESET_CNCT_UNDER_SRST) {
 +		if (jtag_reset_config & RESET_SRST_NO_GATING) {
-+			retval = bbg_swd_gpio_srst(0);
-+			if (retval != ERROR_OK)
-+				return ERROR_FAIL;
++			bbg_swd_gpio_srst(0);
 +			LOG_INFO("Connecting under reset");
 +		}
 +	}
@@ -251,6 +245,14 @@ index 0000000..0363f45
 +	pru_request_cmd(pru_data_ram);
 +}
 +
++static void bbg_swd_gpio_srst(int signal)
++{
++	pru_data_ram[0] = CMD_GPIO_OUT;
++	pru_data_ram[1] = (1 << 15);
++	pru_data_ram[2] = signal ? 1 : 0;
++	pru_request_cmd(pru_data_ram);
++}
++
 +static int bbg_swd_switch_seq(enum swd_special_seq seq)
 +{
 +	LOG_DEBUG("bbg_swd_switch_seq");
@@ -259,20 +261,20 @@ index 0000000..0363f45
 +	case LINE_RESET:
 +		LOG_DEBUG("SWD line reset");
 +		pru_data_ram[0] = CMD_SIG_GEN | (swd_seq_line_reset_len << 8);
-+		memcpy (&pru_data_ram[1], swd_seq_line_reset, swd_seq_line_reset_len);
++		memcpy (&pru_data_ram[1], swd_seq_line_reset, (swd_seq_line_reset_len+7)/8);
 +		pru_request_cmd(pru_data_ram);
 +		break;
 +	case JTAG_TO_SWD:
 +		LOG_DEBUG("JTAG-to-SWD");
-+		pru_data_ram[0] = CMD_SIG_GEN | (swd_seq_jtag_to_swd_len << 8);
-+		memcpy (&pru_data_ram[1], swd_seq_jtag_to_swd, swd_seq_jtag_to_swd_len);
++		pru_data_ram[0] = CMD_SIG_GEN | ((swd_seq_jtag_to_swd_len)<< 8);
++		memcpy (&pru_data_ram[1], swd_seq_jtag_to_swd, (swd_seq_jtag_to_swd_len+7)/8);
 +		pru_request_cmd(pru_data_ram);
 +		bbg_swd_idle(8);
 +		break;
 +	case SWD_TO_JTAG:
-+		LOG_DEBUG("JTAG-to-SWD");
++		LOG_DEBUG("SWD-to-JTAG");
 +		pru_data_ram[0] = CMD_SIG_GEN | (swd_seq_swd_to_jtag_len << 8);
-+		memcpy (&pru_data_ram[1], swd_seq_swd_to_jtag, swd_seq_swd_to_jtag_len);
++		memcpy (&pru_data_ram[1], swd_seq_swd_to_jtag, (swd_seq_swd_to_jtag_len+7)/8);
 +		pru_request_cmd(pru_data_ram);
 +		break;
 +	default:
@@ -283,15 +285,14 @@ index 0000000..0363f45
 +	return ERROR_OK;
 +}
 +
-+static void bbg_swd_clear_sticky_errors(void)
-+{
-+	bbg_swd_write_reg(swd_cmd(false,  false, DP_ABORT),
-+		STKCMPCLR | STKERRCLR | WDERRCLR | ORUNERRCLR, 0);
-+}
-+
 +
 +static void bbg_swd_read_reg(uint8_t cmd, uint32_t *value, uint32_t ap_delay_clk)
 +{
++	int ack;
++	int parity;
++	uint32_t data;
++	uint32_t delay = 0;
++
 +	LOG_DEBUG("bbg_swd_read_reg");
 +	assert(cmd & SWD_CMD_RnW);
 +	assert(ap_delay_clk < 256);
@@ -301,57 +302,40 @@ index 0000000..0363f45
 +		return;
 +	}
 +
-+	for (;;) {
-+		int ack;
-+		int parity;
-+		uint32_t data;
-+		uint32_t delay = 0;
++	if (cmd & SWD_CMD_APnDP)
++		delay = ap_delay_clk;
 +
-+		if (cmd & SWD_CMD_APnDP)
-+			delay = ap_delay_clk;
++	cmd |= 0x81;
++	pru_data_ram[0] = CMD_READ_REG | (cmd << 8) | (delay << 24);
++	pru_request_cmd(pru_data_ram);
++	ack = pru_data_ram[BBG_SWS_RESULT] & 0x07;
++	parity = (pru_data_ram[BBG_SWS_RESULT] & 0x80000000) != 0;
++	data = pru_data_ram[BBG_SWS_RESULT+1];
 +
-+		cmd |= 0x81;
-+		pru_data_ram[0] = CMD_READ_REG | (cmd << 8) | (delay << 24);
-+		pru_request_cmd(pru_data_ram);
-+		ack = pru_data_ram[BBG_SWS_RESULT] & 0x07;
-+		parity = (pru_data_ram[BBG_SWS_RESULT] & 0x80000000) != 0;
-+		data = pru_data_ram[BBG_SWS_RESULT+1];
++	LOG_DEBUG("%s %s %s reg %X = %08" PRIx32,
++		  ack == SWD_ACK_OK ? "OK" : ack == SWD_ACK_WAIT ? "WAIT" : ack == SWD_ACK_FAULT ? "FAULT" : "JUNK",
++		  cmd & SWD_CMD_APnDP ? "AP" : "DP",
++		  cmd & SWD_CMD_RnW ? "read" : "write",
++		  (cmd & SWD_CMD_A32) >> 1,
++		  data);
 +
-+		LOG_DEBUG("%s %s %s reg %X = %08"PRIx32,
-+			  ack == SWD_ACK_OK ? "OK" : ack == SWD_ACK_WAIT ? "WAIT" : ack == SWD_ACK_FAULT ? "FAULT" : "JUNK",
-+			  cmd & SWD_CMD_APnDP ? "AP" : "DP",
-+			  cmd & SWD_CMD_RnW ? "read" : "write",
-+			  (cmd & SWD_CMD_A32) >> 1,
-+			  data);
-+
-+		switch (ack) {
-+		case SWD_ACK_OK:
-+			if (parity != parity_u32(data)) {
-+				LOG_DEBUG("Wrong parity detected (%d)", parity);
-+				queued_retval = ERROR_FAIL;
-+				return;
-+			}
-+			if (value)
-+				*value = data;
-+			return;
-+		case SWD_ACK_WAIT:
-+			LOG_DEBUG("SWD_ACK_WAIT");
-+			bbg_swd_clear_sticky_errors();
-+			break;
-+		case SWD_ACK_FAULT:
-+			LOG_DEBUG("SWD_ACK_FAULT");
-+			queued_retval = ack;
-+			return;
-+		default:
-+			LOG_DEBUG("No valid acknowledge: ack=%d", ack);
-+			queued_retval = ack;
-+			return;
-+		}
++	if (ack != SWD_ACK_OK) {
++		queued_retval = ack == SWD_ACK_WAIT ? ERROR_WAIT : ERROR_FAIL;
++	} else if (parity != parity_u32(data)) {
++		LOG_DEBUG("Wrong parity detected (%d)", parity);
++		queued_retval = ERROR_FAIL;
++	} else if (value) {
++		*value = data;
++		queued_retval = ERROR_OK;
 +	}
 +}
 +
 +static void bbg_swd_write_reg(uint8_t cmd, uint32_t value, uint32_t ap_delay_clk)
 +{
++	int ack;
++	int parity = parity_u32(value);
++	uint32_t delay = 0;
++
 +	LOG_DEBUG("bbg_swd_write_reg");
 +	assert(!(cmd & SWD_CMD_RnW));
 +	assert(ap_delay_clk < 256);
@@ -361,44 +345,24 @@ index 0000000..0363f45
 +		return;
 +	}
 +
-+	for (;;) {
-+		int ack;
-+		int parity = parity_u32(value);
-+		uint32_t delay = 0;
++	if (cmd & SWD_CMD_APnDP)
++		delay = ap_delay_clk;
 +
-+		if (cmd & SWD_CMD_APnDP)
-+			delay = ap_delay_clk;
++	cmd |= 0x81;
++	pru_data_ram[0] = CMD_WRITE_REG | (cmd << 8) | (parity << 16) | (delay << 24);
++	pru_data_ram[1] = value;
++	pru_request_cmd(pru_data_ram);
++	ack = pru_data_ram[BBG_SWS_RESULT] & 0x07;
 +
-+		cmd |= 0x81;
-+		pru_data_ram[0] = CMD_WRITE_REG | (cmd << 8) | (parity << 16) | (delay << 24);
-+		pru_data_ram[1] = value;
-+		pru_request_cmd(pru_data_ram);
-+		ack = pru_data_ram[BBG_SWS_RESULT] & 0x07;
++	LOG_DEBUG("%s %s %s reg %X = %08" PRIx32,
++		  ack == SWD_ACK_OK ? "OK" : ack == SWD_ACK_WAIT ? "WAIT" : ack == SWD_ACK_FAULT ? "FAULT" : "JUNK",
++		  cmd & SWD_CMD_APnDP ? "AP" : "DP",
++		  cmd & SWD_CMD_RnW ? "read" : "write",
++		  (cmd & SWD_CMD_A32) >> 1,
++		  value);
 +
-+		LOG_DEBUG("%s %s %s reg %X = %08"PRIx32,
-+			  ack == SWD_ACK_OK ? "OK" : ack == SWD_ACK_WAIT ? "WAIT" : ack == SWD_ACK_FAULT ? "FAULT" : "JUNK",
-+			  cmd & SWD_CMD_APnDP ? "AP" : "DP",
-+			  cmd & SWD_CMD_RnW ? "read" : "write",
-+			  (cmd & SWD_CMD_A32) >> 1,
-+			  value);
-+
-+		switch (ack) {
-+		case SWD_ACK_OK:
-+			return;
-+		case SWD_ACK_WAIT:
-+			LOG_DEBUG("SWD_ACK_WAIT");
-+			bbg_swd_clear_sticky_errors();
-+			break;
-+		case SWD_ACK_FAULT:
-+			LOG_DEBUG("SWD_ACK_FAULT");
-+			queued_retval = ack;
-+			return;
-+		default:
-+			LOG_DEBUG("No valid acknowledge: ack=%d", ack);
-+			queued_retval = ack;
-+			return;
-+		}
-+	}
++	if (ack != SWD_ACK_OK)
++		queued_retval = ack == SWD_ACK_WAIT ? ERROR_WAIT : ERROR_FAIL;
 +}
 +
 +static int bbg_swd_run_queue(void)

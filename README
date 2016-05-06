@@ -1,7 +1,7 @@
 BeagleBoneGreen SWD - a practical tool for computing freedom
 
-					    		Version 0.01
-							  2016-03-26
+					    		Version 0.02
+							  2016-05-06
 							Niibe Yutaka
 					     Flying Stone Technology
 
@@ -12,28 +12,27 @@ BeagleBoneGreen SWD (BBG-SWD) is a tool to control SWD protocol by
 BeagleBoneGreen.
 
 
-Note for Initial Release 
-========================
+Note for release 0.02
+=====================
 
 The program on PRUSS (Programmable Realtime Unit SubSytem), PRU-SWD,
-is complete.
+was updated to support pin control of SRST.
 
 The BBG-SWD driver for OpenOCD is by a patch:
 
-	0001-initial-patch-for-BBG-SWD.patch
+	0001-Add-new-SWD-driver-bbg-swd.patch
 
-The BBG-SWD driver is ready for use.
+The BBG-SWD driver is ready for use.  It is tested with FST-01 (STM32F103),
+FSM-55 (STM32F030) and prototype of FS-BB48 (KL27Z256).
 
-To see how it works in detail , please see the debug log of OpenOCD:
-
-	flash-write-with-bbg-swd-20160326.log
+Use of "bone-kernel" is assumed for UIO user space PRUSS driver.
 
 
 Future Works
 ============
 
-The reset pin control by SRST is not yet implemented, as FST-01
-doesn't have the pin.  It's easy to implement.
+It would be good to support different speed for communication.
+Now, it is fixed to 1000kHz.
 
 
 The purpose
@@ -81,7 +80,7 @@ Patch for OpenOCD
 =================
 
 The patch is: 
-	0001-initial-patch-for-BBG-SWD.patch
+	0001-Add-new-SWD-driver-bbg-swd.patch
 
 You can configure BBG-SWD driver by the --enable-bbg-swd option.
 
@@ -99,6 +98,16 @@ The invacatio of command is something like this:
     $ openocd -f  bbg-swd.cfg -f target/stm32f1x.cfg
 
 The above is the case for FST-01.
+
+
+For FS-BB48 (which uses Freescale's KL27Z256), I use following configuration.
+
+-------------------------- File: kl27-bbg-swd.cfg
+interface bbg-swd
+set CHIPNAME kl27
+source [find target/klx.cfg]
+reset_config srst_only separate srst_nogate srst_push_pull connect_assert_srst
+--------------------------
 
 
 Request-Response
